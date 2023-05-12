@@ -1,97 +1,109 @@
 library(tsinterp)
 library(interpTools)
 
+
 set.seed(42)
 
-## Generating the time series
-xt = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
-plot(xt, type = 'l'); grid()
 
-## trend coefficient: 6.855  
-
-## Imposing some gaps in the time series
-xt_gappy = simulateGaps(list(xt), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
-
-## Saving the index of gapped points
-gap = which(is.na(xt_gappy) == TRUE)
+## Simulating the truth time series and imposing gap structure
+x = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
+x_gappy = simulateGaps(list(x), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
 
 
-## --- Starting TSimpute work ---
+## 
+initialize <- function(x_gappy){
+  
+  ## Saving the index of gapped points
+  gap = which(is.na(x_gappy) == TRUE)
 
-## Identifying gap structure
-gapTrue = rep(NA, length(xt_gappy))
-gapTrue[-gap] = TRUE
-
-## Finding blocks of missing points
-blocks = tsinterp::findBlocks(gapTrue)
-
-## Initial imputation using linear interpolation approach
-z0 = xt_gappy
-zI = linInt(z0, blocks)
-
-## Setting parameters
-N = length(xt_gappy)
-maxit = 20
-progress = FALSE
-sigClip = 0.999
-delT = 1
-
-## Estimating trend/mean and periodic components
-par(mfrow = c(1,1))
-MtP = estimateMt(x = zI, N = N, nw = 5, k = 8, pMax = 2)
-lines(MtP, col = 'blue', lwd = 0.5)
-
-## From TSimpute: returns a line (vector of points). Need to figure out how to extract
-## components of the line/quadratic/cubic in order to simulate from interpTools
-
-
-
-
-
-
-
-TtTmp = estimateTt(x = zI - MtP, epsilon = 1e-6, dT = delT, nw = 5, k = 8, 
-                             sigClip = sigClip, progress = progress)
-
-plot(zI - MtP, type = 'l', col = 'black'); grid()
-lines(TtTmp[,1], type = 'l', col = 'blue', lwd = 0.5)
-
-
-
-
-
-set.seed(62)
-numTrend = 2
-N = 100
-t = 0:(N-1)
-mu = 0
-x = simMt(N = N, mu = mu, numTrend = numTrend)
-xt = x$value
-x_fun = x$fn
-
-plot(xt, type = 'l'); grid()
-
-mean(xt)
-xt[47]
-
-
-if(numTrend > 0){
-  mut <- paste("(",a,")*((t-", center,")/N)^",1:numTrend," +", sep = "", collapse = "")
-  mut <- gsub(".{1}$", "", mut)
+  ## Identifying gap structure
+  gapTrue = rep(NA, length(x_gappy))
+  gapTrue[-gap] = TRUE
+  
+  ## Finding blocks of missing points
+  blocks = tsinterp::findBlocks(gapTrue)
+  
+  ## Initial imputation using linear interpolation approach
+  x0 = x_gappy
+  xI = linInt(x0, blocks)
+  return(xI)
 }
 
-mut_fn <- mut
-Mt_fn <- paste(c(mut_fn,"+",mu),collapse=" ")
 
-mut <- eval(parse(text = paste(mut,collapse="")))
-Mt <- mut+mu
+estimator <- function(x, delT, sigClip){
+  
+  ## Estimating trend and periodic components
+  Mt = estimateMt(x = x, N = length(x), nw = 5, k = 8, pMax = 2)
+  Tt = estimateTt(x = x - Mt, epsilon = 1e-6, dT = delT, nw = 5, k = 8, sigClip = sigClip)
+  
+  return(Mt + Tt)
+}
 
 
-lines(Mt, type = 'l', col = 'blue', lwd = 0.5)
+data_generator <- function(x, n_series, var, p, g, K){
+  
+  N = length(x)
+  M = n_series * K
+  inputs_temp = c()
+  targets_temp = c()
+  
+  for (i in 1:n_series){
+    
+    x_p = x + rnorm(1, 0, var) + rnorm(N, 0, var)
+    x_g = simulateGaps(list(x_p), p = p, g = g, K = K)
+    
+    for (k in 1:K){
+      structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
+      inputs_temp = c(inputs_temp, eval(parse(text = structure)))
+      targets_temp = c(targets_temp, x_p)
+    }
+  }
+  inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N))
+  targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N))  
+  return(list(inputs, targets))
+}
 
 
 
-mean(Mt)
+nn_imputer <- function(x0, max_iter, size, p, g){
+  
+  ## Initialize the imputation problem
+  xI = initialize(x0)
+  
+  ## 
+  for (i in 1:max_iter){
+    
+    ## Getting an estimate for trend and periodic components
+    xI = estimator(xI, delT = 1, sigClip = 0.999)
+    
+    ## Generating training data
+    return(data_generator(xI, n_series = size, var = 0.25, p = p, g = g, K = 5))
+  }
+}
+
+testb = nn_imputer(x_gappy, max_iter = 1, size = 5, p = 0.05, g = 1)
+
+testb
+
+
+plot(x_gappy, type = 'l', lwd = 2); grid(); 
+lines(testb[[2]][25,], type = 'l', col = 'red', lwd = 0.5)
+lines(testb[[1]][25,], type = 'l', col = 'blue')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -435,4 +447,3 @@ findPowers <- function(N,f0,Nyq,prec) {
     return(nFFT)
   }
 }
-
