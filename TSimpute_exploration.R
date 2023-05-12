@@ -41,6 +41,13 @@ par(mfrow = c(1,1))
 MtP = estimateMt(x = zI, N = N, nw = 5, k = 8, pMax = 2)
 lines(MtP, col = 'blue', lwd = 0.5)
 
+## From TSimpute: returns a line (vector of points). Need to figure out how to extract
+## components of the line/quadratic/cubic in order to simulate from interpTools
+
+
+
+
+
 
 
 TtTmp = estimateTt(x = zI - MtP, epsilon = 1e-6, dT = delT, nw = 5, k = 8, 
@@ -60,11 +67,12 @@ t = 0:(N-1)
 mu = 0
 x = simMt(N = N, mu = mu, numTrend = numTrend)
 xt = x$value
-
-
 x_fun = x$fn
 
 plot(xt, type = 'l'); grid()
+
+mean(xt)
+xt[47]
 
 
 if(numTrend > 0){
