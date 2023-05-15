@@ -1,5 +1,11 @@
 library(tsinterp)
 library(interpTools)
+library(tensorflow)
+library(keras)
+
+
+
+install.packages("dplyr",dependencies=TRUE)
 
 
 set.seed(42)
@@ -59,8 +65,34 @@ data_generator <- function(x, n_series, var, p, g, K){
     }
   }
   inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N))
-  targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N))  
+  targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N))
+  
   return(list(inputs, targets))
+}
+
+
+impute <- function(inputs, targets, mask_value){
+  
+  N = dim(inputs)[2]
+  
+  ## Constructing and compiling the model
+  autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
+    layer_masking(mask_value = mask_value, input_shape = c(N)) %>%
+    layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
+    layer_dense(units = N, activation = 'sigmoid', name = 'decoder')
+  
+  autoencoder %>% compile(
+    optimizer = 'adam',
+    loss = 'binary_crossentropy')
+  
+  ## Fitting the model to the training data
+  autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, 
+                      shuffle = FALSE, validation_split = 0.2)
+  
+  ## Predicting on the testing set
+  preds = autoencoder %>% predict(inputs)
+  
+  return(preds)
 }
 
 
@@ -79,28 +111,45 @@ nn_imputer <- function(x0, max_iter, size, p, g){
     ## Generating training data
     data = data_generator(xI, n_series = size, var = 0.25, p = p, g = g, K = 5)
     inputs = data[[1]]; targets = data[[2]]
+    
+    ## Building neural network
+    #preds = impute(inputs, targets, mask_value = NA)
   }
   return(list(inputs, targets))
 }
 
-testb = nn_imputer(x_gappy, max_iter = 1, size = 5, p = 0.05, g = 1)
+testb = nn_imputer(x_gappy, max_iter = 1, size = 20, p = 0.05, g = 1)
 
 testb
 
 
 plot(x_gappy, type = 'l', lwd = 2); grid(); 
-lines(testb[[2]][25,], type = 'l', col = 'red', lwd = 0.5)
-lines(testb[[1]][25,], type = 'l', col = 'blue')
+lines(testb[[2]][1,], type = 'l', col = 'red', lwd = 0.5)
+lines(testb[[1]][1,], type = 'l', col = 'blue')
+
+
+dim(testb[[1]])
 
 
 
 
 
 
+autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
+  layer_masking(mask_value = mask_value, input_shape = c(100)) %>%
+  layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
+  layer_dense(units = 100, activation = 'sigmoid', name = 'decoder')
 
+autoencoder %>% compile(
+  optimizer = 'adam',
+  loss = 'binary_crossentropy')
 
+## Fitting the model to the training data
+autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, 
+                    shuffle = FALSE, validation_split = 0.2)
 
-
+## Predicting on the testing set
+preds = autoencoder %>% predict(inputs)
 
 
 
