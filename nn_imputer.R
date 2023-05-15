@@ -77,8 +77,10 @@ nn_imputer <- function(x0, max_iter, size, p, g){
     xI = estimator(xI, delT = 1, sigClip = 0.999)
     
     ## Generating training data
-    return(data_generator(xI, n_series = size, var = 0.25, p = p, g = g, K = 5))
+    data = data_generator(xI, n_series = size, var = 0.25, p = p, g = g, K = 5)
+    inputs = data[[1]]; targets = data[[2]]
   }
+  return(list(inputs, targets))
 }
 
 testb = nn_imputer(x_gappy, max_iter = 1, size = 5, p = 0.05, g = 1)
