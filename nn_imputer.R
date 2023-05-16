@@ -4,45 +4,49 @@ library(tensorflow)
 library(keras)
 
 
-
-install.packages("dplyr",dependencies=TRUE)
-
-
 set.seed(42)
 
 
 ## Simulating the truth time series and imposing gap structure
 x = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
-x_gappy = simulateGaps(list(x), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
+a = min(x); b = max(x)
+x = (x - a) / (b - a)
+x_gappy = simulateGaps(list(x), p = 0.05, g = 1, K = 1)[[1]]$p0.05$g1[[1]]
+plot(x, type = 'l')
+lines(x_gappy, type = 'l', col = 'cyan')
+grid()
 
 
 ## 
-initialize <- function(x_gappy){
+initialize <- function(x0){
   
-  ## Saving the index of gapped points
-  gap = which(is.na(x_gappy) == TRUE)
-
-  ## Identifying gap structure
-  gapTrue = rep(NA, length(x_gappy))
+  ## Saving the index of gaps
+  gap = which(is.na(x0) == TRUE)
+  gapTrue = rep(NA, length(x0))
   gapTrue[-gap] = TRUE
   
   ## Finding blocks of missing points
   blocks = tsinterp::findBlocks(gapTrue)
   
   ## Initial imputation using linear interpolation approach
-  x0 = x_gappy
   xI = linInt(x0, blocks)
   return(xI)
 }
 
 
-estimator <- function(x, delT, sigClip){
-  
-  ## Estimating trend and periodic components
+estimator <- function(x){
   Mt = estimateMt(x = x, N = length(x), nw = 5, k = 8, pMax = 2)
-  Tt = estimateTt(x = x - Mt, epsilon = 1e-6, dT = delT, nw = 5, k = 8, sigClip = sigClip)
-  
+  Tt = estimateTt(x = x - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999)
   return(Mt + Tt)
+}
+
+
+preprocess <- function(x){
+  for (i in 1:dim(x)[1]){
+    x[i,] = (x[i,] - min(x[i,], na.rm = TRUE)) / (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE))
+    x[i,] = ifelse(is.na(x[i,]), 0, x[i,])
+  }
+  return(x)
 }
 
 
@@ -64,17 +68,23 @@ data_generator <- function(x, n_series, var, p, g, K){
       targets_temp = c(targets_temp, x_p)
     }
   }
+
   inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N))
   targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N))
+  
+  inputs = preprocess(inputs)
+  targets = preprocess(targets)
   
   return(list(inputs, targets))
 }
 
 
-impute <- function(inputs, targets, mask_value){
+impute <- function(x0, inputs, targets, mask_value){
   
   N = dim(inputs)[2]
-  
+  x0 = ifelse(is.na(x0), 0, x0)
+  x0 = as.array(matrix(x0, nrow = 1, byrow = TRUE))
+
   ## Constructing and compiling the model
   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
     layer_masking(mask_value = mask_value, input_shape = c(N)) %>%
@@ -86,70 +96,95 @@ impute <- function(inputs, targets, mask_value){
     loss = 'binary_crossentropy')
   
   ## Fitting the model to the training data
-  autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, 
-                      shuffle = FALSE, validation_split = 0.2)
+  autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, shuffle = TRUE, 
+                      validation_split = 0.2, verbose = 0)
   
   ## Predicting on the testing set
-  preds = autoencoder %>% predict(inputs)
-  
+  preds = autoencoder %>% predict(x0, verbose = 0)
   return(preds)
 }
 
 
 
-nn_imputer <- function(x0, max_iter, size, p, g){
+nn_imputer <- function(x0, max_iter, size, p, g, K, var){
   
-  ## Initialize the imputation problem
+  ## 1. Initialize and fill gaps
   xI = initialize(x0)
   
-  ## 
+  ## Repeating Steps 2-6 
   for (i in 1:max_iter){
     
-    ## Getting an estimate for trend and periodic components
-    xI = estimator(xI, delT = 1, sigClip = 0.999)
+    ## 2. Estimate trend and periodic components
+    x_estimate = estimator(xI)
     
-    ## Generating training data
-    data = data_generator(xI, n_series = size, var = 0.25, p = p, g = g, K = 5)
+    ## 3/4. Simulating time series and imposing a gap structure
+    data = data_generator(x_estimate, n_series = size, var = var, p = p, g = g, K = K)
     inputs = data[[1]]; targets = data[[2]]
     
-    ## Building neural network
-    #preds = impute(inputs, targets, mask_value = NA)
+    ## 5. Constructing, compiling, and fitting neural network autoencoder 
+    pred = impute(x0, inputs, targets, mask_value = 0)
+    
+    ## 6. Extracting the predicted values
+    x_old = xI
+    xI = ifelse(is.na(x0), pred, x0)
+    
+    abs_diff = sum(abs(xI - x_old))
+    print(paste0('Interation ', i, ' --- ', abs_diff))
   }
-  return(list(inputs, targets))
+  #return(list(inputs, targets))
+  return(xI)
 }
 
-testb = nn_imputer(x_gappy, max_iter = 1, size = 20, p = 0.05, g = 1)
+testb = nn_imputer(x_gappy, max_iter=10, size=25, p=0.05, g=1, K=10, var=0.05)
+
+plot(x, type = 'l', lwd = 2); grid()
+lines(testb, type = 'l', col = 'cyan')
+
+
+plot(x_gappy, type = 'l', lwd = 2); grid()
+lines(testb[1,], col = 'red')
+
+imputed = ifelse(is.na(x_gappy), testb[1,], x_gappy)
+lines(imputed, type = 'l', col = 'blue', lwd = 0.5)
+
+
+
+
+
 
 testb
 
-
-plot(x_gappy, type = 'l', lwd = 2); grid(); 
-lines(testb[[2]][1,], type = 'l', col = 'red', lwd = 0.5)
-lines(testb[[1]][1,], type = 'l', col = 'blue')
+plot(testb[1,], type = 'l', lwd = 2); grid()
+lines(testb[[2]][1,], col = 'red', lwd = 0.5)
 
 
-dim(testb[[1]])
+plot(x, type = 'l', lwd = 2); grid(); 
+for (i in 1:25){
+  lines(testb[[2]][i,], type = 'l', lwd = 0.3, col = 'blue')
+}
+
+plot(testb[[2]][1,], type = 'l'); grid()
+for (i in 1:10){
+  lines(testb[[1]][i,], col = 'red', lwd = 0.5)
+}
+
+
+lines(testb[[4]][1,], type = 'l', col = 'red')
+lines(testb[[4]][6,], type = 'l', col = 'red')
+
+lines(testb[[3]][1,], type = 'l', col = 'cyan')
+lines(testb[[3]][6,], type = 'l', col = 'cyan')
+
+
+## Lets try scaling from 0.1 to 0.9
+
+# xt = (0.9 - 0.1) * (xt - min(xt)) / (max(xt) - min(xt)) + 0.1
+# Then weights might not get mixed up in NN
 
 
 
 
 
-
-autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-  layer_masking(mask_value = mask_value, input_shape = c(100)) %>%
-  layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
-  layer_dense(units = 100, activation = 'sigmoid', name = 'decoder')
-
-autoencoder %>% compile(
-  optimizer = 'adam',
-  loss = 'binary_crossentropy')
-
-## Fitting the model to the training data
-autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, 
-                    shuffle = FALSE, validation_split = 0.2)
-
-## Predicting on the testing set
-preds = autoencoder %>% predict(inputs)
 
 
 
