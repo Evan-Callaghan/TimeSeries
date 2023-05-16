@@ -3,6 +3,31 @@
 ########################################
 
 
+#' Algorithm
+#' 
+#' 1. Interpolate missing values in the original time series using linear interpolation.
+#' 
+#' 2. a. Estimate the trend components of the input time series
+#'    b. Estimate the periodic component(s) of the input time series
+#'    
+#' 3. Simulate a sufficient number of time series with the same trend and periodic structure 
+#'    using small perturbations (inputs). 
+#'    
+#' 4. Impose a gap structure on the simulated time series (i.e., the same gap structure as 
+#'    observed in the original time series) and produce K unique ‘gappy’ time series (targets).
+#'    
+#' 5. Construct, compile, and fit a neural network autoencoder model using the newly created input 
+#'    and target time series. Using the autoencoder, predict on the original time series.
+#'    
+#' 6. Extract the predicted values of the missing data points to complete the original time series. 
+#' 
+#' 7. Repeat steps 2-6 using the output of Step 6 as the input for Step 2, each time storing the 
+#'    predictions.
+#'    
+#' 8. Return the final predictions as the average predictions over the total number of iterations. 
+#' 
+
+
 ## Importing libraries
 ## -----------------------
 library(tsinterp)
@@ -14,157 +39,123 @@ library(keras)
 ## Defining all functions
 ## -----------------------
 
+
 #' initialize
 #' 
 #' Function to initialize the imputation process. Completes the first step of the designed algorithm 
-#' ## which is to linearly impute the missing values as a starting point.
+#' which is to linearly impute the missing values as a starting point.
 #' @param x0 {list}; List object containing the original incomplete time series
 #' 
 initialize <- function(x0){
-  
   gapTrue = ifelse(is.na(x0), NA, TRUE) ## Identifying gap structure
   blocks = tsinterp::findBlocks(gapTrue) ## Computing block structure
-  xI = linInt(x0, blocks) ## Initial imputation using linear interpolation
-  
+  xI = tsinterp::linInt(x0, blocks) ## Initial imputation using linear interpolation
   return(xI)
 }
 
 
+#' estimator
+#' 
+#' Function to estimate the trend and periodic components of a given time series. Completes the second 
+#' step of the designed algorithm.
+#' @param x {list}; List object containing a complete time series
+#' 
 estimator <- function(x){
-  Mt = estimateMt(x = x, N = length(x), nw = 5, k = 8, pMax = 2)
-  Tt = estimateTt(x = x - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999)
-  return(Mt + Tt)
+  Mt = estimateMt(x = x, N = length(x), nw = 5, k = 8, pMax = 2) ## Estimating trend component
+  Tt = estimateTt(x = x - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999) ## Estimating periodic components
+  Xt = Mt
+  for (i in 1:dim(Tt)[2]){
+    Xt = Xt + Tt[,i]
+  }
+  return(Xt)
 }
 
 
+#' preprocess
+#' 
+#' Function to preprocess the data before building the neural network imputer. The function performs 0-1
+#' standardization for each time series in the input matrix and masks NA values with 0 (necessary for 
+#' the neural network).
+#' @param x {matrix}; Matrix object containing a time series in each row
+#' 
 preprocess <- function(x){
   for (i in 1:dim(x)[1]){
-    x[i,] = (x[i,] - min(x[i,], na.rm = TRUE)) / (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE))
-    x[i,] = ifelse(is.na(x[i,]), 0, x[i,])
+    x[i,] = (x[i,] - min(x[i,], na.rm = TRUE)) / 
+            (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE)) ## Standardizing to the 0-1 scale
+    x[i,] = ifelse(is.na(x[i,]), 0, x[i,]) ## Masking NA values
   }
   return(x)
 }
 
 
-data_generator <- function(x, n_series, var, p, g, K){
-  
-  N = length(x)
-  M = n_series * K
-  inputs_temp = c()
-  targets_temp = c()
+#' simulator
+#' 
+#' Function to simulate a number of time series with on slight perturbations given the estimated
+#' structure of the original time series. With each new series, a specified gap structure is 
+#' imposed and returned are two data matrices: one with missing gaps (inputs) and one that is
+#' complete (targets). Completes the third and fourth steps of the designed algorithm.
+#' @param x {list}; List object containing a complete time series 
+#' @param n_series {integer}; Number of new time series to construct
+#' @param var {float}; Variance for perturbations
+#' @param p {flaot}; Proportion of missing data to be applied to the simulated series
+#' @param g {integer}; Gap width of missing data to be applied to the simulated series
+#' @param K {integer}; Number of output series with a unique gap structure for each simulated series
+#' 
+simulator <- function(x, n_series, var, p, g, K){
+  N = length(x); M = n_series * K ## Defining useful parameters
+  inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
   
   for (i in 1:n_series){
-    
-    x_p = x + rnorm(1, 0, var) + rnorm(N, 0, var)
-    x_g = simulateGaps(list(x_p), p = p, g = g, K = K)
+    x_p = x + rnorm(1, 0, var) + rnorm(N, 0, var) ## Creating small perturbation
+    x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
     
     for (k in 1:K){
       structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
-      inputs_temp = c(inputs_temp, eval(parse(text = structure)))
-      targets_temp = c(targets_temp, x_p)
+      inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+      targets_temp = c(targets_temp, x_p) ## Appending targets
     }
   }
-
-  inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N))
-  targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N))
-  
-  inputs = preprocess(inputs)
-  targets = preprocess(targets)
-  
+  inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting inputs
+  targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting targets
+  inputs = preprocess(inputs) ## Preprocessing inputs
+  targets = preprocess(targets) ## Preprocessing targets
   return(list(inputs, targets))
 }
 
 
-impute <- function(x0, inputs, targets, mask_value){
+#' impute
+#' 
+#' Function to construct, compile, and fit a neural network model on the simulated training data
+#' and then predict on the original time series. Completes the fifth step of the designed algorithm.
+#' @param x0 {list}; List object containing the original incomplete time series
+#' @param inputs {matrix}; Matrix object containing the input training data
+#' @param targets {matrix}; Matrix object containing the target training data
+#' 
+impute <- function(x0, inputs, targets){
+  N = dim(inputs)[2] ## Defining useful parameters
+  x0 = as.array(matrix(ifelse(is.na(x0), 0, x0), nrow = 1, byrow = TRUE)) ## Formatting original series
   
-  N = dim(inputs)[2]
-  x0 = ifelse(is.na(x0), 0, x0)
-  x0 = as.array(matrix(x0, nrow = 1, byrow = TRUE))
-
-  ## Constructing and compiling the model
-  autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-    layer_masking(mask_value = mask_value, input_shape = c(N)) %>%
+  autoencoder = keras_model_sequential(name = 'Autoencoder') %>% ## Constructing the model
+    layer_masking(mask_value = 0, input_shape = c(N)) %>%
     layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
-    layer_dense(units = N, activation = 'sigmoid', name = 'decoder')
+    layer_dense(units = N, activation = 'sigmoid', name = 'decoder') 
   
-  autoencoder %>% compile(
+  autoencoder %>% compile( ## Compiling the model
     optimizer = 'adam',
     loss = 'binary_crossentropy')
   
+  autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, ## Fitting the model to the training data
+                      shuffle = TRUE, validation_split = 0.2, verbose = 0)
   
-  
-  
-  
-  ## Fitting the model to the training data
-  autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, shuffle = TRUE, 
-                      validation_split = 0.2, verbose = 0)
-  
-  ## Predicting on the testing set
-  preds = autoencoder %>% predict(x0, verbose = 0)
+  preds = autoencoder %>% predict(x0, verbose = 0) ## Predicting on the original series
   return(preds)
 }
 
 
+## Defining all copied functions from TSinterp
+## -----------------------
+## -----------------------
 
-nn_imputer <- function(x0, max_iter, size, p, g, K, var){
-  
-  ## 1. Initialize and fill gaps
-  xI = initialize(x0)
-  results = matrix(NA, ncol = length(x0), nrow = max_iter)
-  
-  ## Repeating Steps 2-6 
-  for (i in 1:max_iter){
-    
-    ## 2. Estimate trend and periodic components
-    x_estimate = estimator(xI)
-    
-    ## 3/4. Simulating time series and imposing a gap structure
-    data = data_generator(x_estimate, n_series = size, var = var, p = p, g = g, K = K)
-    inputs = data[[1]]; targets = data[[2]]
-    
-    ## 5. Constructing, compiling, and fitting neural network autoencoder 
-    pred = impute(x0, inputs, targets, mask_value = 0)
-    
-    ## 6. Extracting the predicted values and returning complete time series
-    xI = ifelse(is.na(x0), pred, x0); results[i,] = xI
-    
-    print(paste0('Interation ', i))
-  }
-  return(colMeans(results))
-}
-
-
-set.seed(42)
-x = simXt(N = 200, mu = 0, numTrend = 1, numFreq = 2)$Xt
-a = min(x); b = max(x)
-x = (x - a) / (b - a)
-x_gappy = simulateGaps(list(x), p = 0.05, g = 1, K = 1)
-plot(x, type = 'l')
-lines(x_gappy[[1]]$p0.05$g1[[1]], type = 'l', col = 'cyan')
-grid()
-
-
-x_hwi = parInterpolate(x_gappy, methods = c('HWI'))[[1]]$HWI$p0.05$g1[[1]]
-x_nn = nn_imputer(x_gappy[[1]]$p0.05$g1[[1]], max_iter=10, size=25, p=0.05, g=1, K=10, var=0.05)
-
-eval_performance(x = x, X = x_hwi, gappyx = x_gappy[[1]]$p0.05$g1[[1]])$RMSE
-eval_performance(x = x, X = x_nn, gappyx = x_gappy[[1]]$p0.05$g1[[1]])$RMSE
-
-plot(x, type = 'l', lwd = 2); grid()
-lines(x_hwi, type = 'l', col = 'red', lwd = 0.5)
-lines(x_nn, type = 'l', col = 'cyan', lwd = 0.5)
-
-
-
-
-
-
-
-
-
-#############################
-## Functions from TSimpute ##
-#############################
 
 ## Defining function to estimate trend component
 estimateMt <- function(x, N, nw, k, pMax) {
@@ -502,3 +493,73 @@ findPowers <- function(N,f0,Nyq,prec) {
     return(nFFT)
   }
 }
+
+
+
+
+## Defining main method
+## -----------------------
+
+
+#' main
+#' 
+#' Function that works through the designed algorithm and calls functions in order.
+#' @param x0 {list}; List object containing the original incomplete time series
+#' @param max_iter {integer}; Maximum number of iterations of the algorithm to perform
+#' @param n_series {integer}; Number of new time series to construct
+#' @param p {flaot}; Proportion of missing data to be applied to the simulated series
+#' @param g {integer}; Gap width of missing data to be applied to the simulated series
+#' @param K {integer}; Number of output series with a unique gap structure for each simulated series
+#' @param var {float}; Variance for perturbations
+#'
+main <- function(x0, max_iter, n_series, p, g, K, var){
+  
+  results = matrix(NA, ncol = length(x0), nrow = max_iter) ## Defining matrix to store results
+  xI = initialize(x0) ## Step 1
+  
+  for (i in 1:max_iter){
+    x_est = estimator(xI) ## Step 2
+    data = simulator(x_est, n_series, var, p, g, K); inputs = data[[1]]; targets = data[[2]] ## Steps 3/4
+    pred = impute(x0, inputs, targets) ## Step 5
+    xI = ifelse(is.na(x0), pred, x0); results[i,] = xI ## Step 6
+    print(paste0('Interation ', i))
+  }
+  return(colMeans(results))
+}
+
+
+
+
+
+## Comparing performance across methods:
+x = simXt(N = 500, numTrend = 1, a = 10)$Xt; x = (x - min(x)) / (max(x) - min(x))
+x_gappy = simulateGaps(list(x), p = 0.1, g = 1, K = 1)
+plot(x, type = 'l')
+lines(x_gappy[[1]]$p0.1$g1[[1]], type = 'l', col = 'cyan')
+grid()
+
+
+interp = parInterpolate(x_gappy, methods = c('HWI', 'NN', 'LOCF', 'LWMA'))
+x_hwi = interp[[1]]$HWI$p0.1$g1[[1]]
+x_nn = interp[[1]]$NN$p0.1$g1[[1]]
+x_locf = interp[[1]]$LOCF$p0.1$g1[[1]]
+x_lwma = interp[[1]]$LWMA$p0.1$g1[[1]]
+
+x_neural = main(x_gappy[[1]]$p0.1$g1[[1]], max_iter=10, n_series=50, p=0.1, g=1, K=10, var=0.03)
+
+
+eval_performance(x = x, X = x_hwi, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
+eval_performance(x = x, X = x_nn, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
+eval_performance(x = x, X = x_locf, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
+eval_performance(x = x, X = x_lwma, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
+eval_performance(x = x, X = x_neural, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
+
+
+
+
+
+
+
+
+
+
