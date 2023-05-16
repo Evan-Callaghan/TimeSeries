@@ -1,35 +1,31 @@
+########################################
+## Neural Network Time Series Imputer ##
+########################################
+
+
+## Importing libraries
+## -----------------------
 library(tsinterp)
 library(interpTools)
 library(tensorflow)
 library(keras)
 
 
-set.seed(42)
+## Defining all functions
+## -----------------------
 
-
-## Simulating the truth time series and imposing gap structure
-x = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
-a = min(x); b = max(x)
-x = (x - a) / (b - a)
-x_gappy = simulateGaps(list(x), p = 0.05, g = 1, K = 1)[[1]]$p0.05$g1[[1]]
-plot(x, type = 'l')
-lines(x_gappy, type = 'l', col = 'cyan')
-grid()
-
-
-## 
+#' initialize
+#' 
+#' Function to initialize the imputation process. Completes the first step of the designed algorithm 
+#' ## which is to linearly impute the missing values as a starting point.
+#' @param x0 {list}; List object containing the original incomplete time series
+#' 
 initialize <- function(x0){
   
-  ## Saving the index of gaps
-  gap = which(is.na(x0) == TRUE)
-  gapTrue = rep(NA, length(x0))
-  gapTrue[-gap] = TRUE
+  gapTrue = ifelse(is.na(x0), NA, TRUE) ## Identifying gap structure
+  blocks = tsinterp::findBlocks(gapTrue) ## Computing block structure
+  xI = linInt(x0, blocks) ## Initial imputation using linear interpolation
   
-  ## Finding blocks of missing points
-  blocks = tsinterp::findBlocks(gapTrue)
-  
-  ## Initial imputation using linear interpolation approach
-  xI = linInt(x0, blocks)
   return(xI)
 }
 
@@ -95,6 +91,10 @@ impute <- function(x0, inputs, targets, mask_value){
     optimizer = 'adam',
     loss = 'binary_crossentropy')
   
+  
+  
+  
+  
   ## Fitting the model to the training data
   autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, shuffle = TRUE, 
                       validation_split = 0.2, verbose = 0)
@@ -110,6 +110,7 @@ nn_imputer <- function(x0, max_iter, size, p, g, K, var){
   
   ## 1. Initialize and fill gaps
   xI = initialize(x0)
+  results = matrix(NA, ncol = length(x0), nrow = max_iter)
   
   ## Repeating Steps 2-6 
   for (i in 1:max_iter){
@@ -124,66 +125,34 @@ nn_imputer <- function(x0, max_iter, size, p, g, K, var){
     ## 5. Constructing, compiling, and fitting neural network autoencoder 
     pred = impute(x0, inputs, targets, mask_value = 0)
     
-    ## 6. Extracting the predicted values
-    x_old = xI
-    xI = ifelse(is.na(x0), pred, x0)
+    ## 6. Extracting the predicted values and returning complete time series
+    xI = ifelse(is.na(x0), pred, x0); results[i,] = xI
     
-    abs_diff = sum(abs(xI - x_old))
-    print(paste0('Interation ', i, ' --- ', abs_diff))
+    print(paste0('Interation ', i))
   }
-  #return(list(inputs, targets))
-  return(xI)
+  return(colMeans(results))
 }
 
-testb = nn_imputer(x_gappy, max_iter=10, size=25, p=0.05, g=1, K=10, var=0.05)
+
+set.seed(42)
+x = simXt(N = 200, mu = 0, numTrend = 1, numFreq = 2)$Xt
+a = min(x); b = max(x)
+x = (x - a) / (b - a)
+x_gappy = simulateGaps(list(x), p = 0.05, g = 1, K = 1)
+plot(x, type = 'l')
+lines(x_gappy[[1]]$p0.05$g1[[1]], type = 'l', col = 'cyan')
+grid()
+
+
+x_hwi = parInterpolate(x_gappy, methods = c('HWI'))[[1]]$HWI$p0.05$g1[[1]]
+x_nn = nn_imputer(x_gappy[[1]]$p0.05$g1[[1]], max_iter=10, size=25, p=0.05, g=1, K=10, var=0.05)
+
+eval_performance(x = x, X = x_hwi, gappyx = x_gappy[[1]]$p0.05$g1[[1]])$RMSE
+eval_performance(x = x, X = x_nn, gappyx = x_gappy[[1]]$p0.05$g1[[1]])$RMSE
 
 plot(x, type = 'l', lwd = 2); grid()
-lines(testb, type = 'l', col = 'cyan')
-
-
-plot(x_gappy, type = 'l', lwd = 2); grid()
-lines(testb[1,], col = 'red')
-
-imputed = ifelse(is.na(x_gappy), testb[1,], x_gappy)
-lines(imputed, type = 'l', col = 'blue', lwd = 0.5)
-
-
-
-
-
-
-testb
-
-plot(testb[1,], type = 'l', lwd = 2); grid()
-lines(testb[[2]][1,], col = 'red', lwd = 0.5)
-
-
-plot(x, type = 'l', lwd = 2); grid(); 
-for (i in 1:25){
-  lines(testb[[2]][i,], type = 'l', lwd = 0.3, col = 'blue')
-}
-
-plot(testb[[2]][1,], type = 'l'); grid()
-for (i in 1:10){
-  lines(testb[[1]][i,], col = 'red', lwd = 0.5)
-}
-
-
-lines(testb[[4]][1,], type = 'l', col = 'red')
-lines(testb[[4]][6,], type = 'l', col = 'red')
-
-lines(testb[[3]][1,], type = 'l', col = 'cyan')
-lines(testb[[3]][6,], type = 'l', col = 'cyan')
-
-
-## Lets try scaling from 0.1 to 0.9
-
-# xt = (0.9 - 0.1) * (xt - min(xt)) / (max(xt) - min(xt)) + 0.1
-# Then weights might not get mixed up in NN
-
-
-
-
+lines(x_hwi, type = 'l', col = 'red', lwd = 0.5)
+lines(x_nn, type = 'l', col = 'cyan', lwd = 0.5)
 
 
 
