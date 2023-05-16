@@ -1,3 +1,2 @@
-# TimeSeries
-Thesis work
-This line was edited in RStudio.
+# TimeSeries Repository
+Thesis work creating a time series imputation method with neural networks.
