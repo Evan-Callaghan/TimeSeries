@@ -637,6 +637,8 @@ eval_performance(x = xt, X = x_hwi, gappyx = x_gapped[[1]]$p0.1$g2[[1]])$RMSE
 
 
 
+
+
 ## Comparing performance across methods:
 x = simXt(N = 500, numTrend = 1, a = 10)$Xt; x = (x - min(x)) / (max(x) - min(x))
 x_gappy = simulateGaps(list(x), p = 0.1, g = 1, K = 1)
