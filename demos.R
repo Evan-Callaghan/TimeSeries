@@ -618,7 +618,7 @@ legend('topleft', legend = c('True TS', 'Imputed TS', 'Missing Point'),
 ## Computing the MSE of neural network imputer
 eval_performance(x = xt, X = nn_predictions, gappyx = x_gappy)$RMSE
 
-## For Example - imputing using HWI and LI and comparing results (MSE)
+## For example - imputing using HWI and LI and comparing results (MSE)
 x_hwi = parInterpolate(x_gapped, methods = 'HWI')[[1]]$HWI$p0.1$g2[[1]]
 x_li = parInterpolate(x_gapped, methods = 'LI')[[1]]$LI$p0.1$g2[[1]]
 
