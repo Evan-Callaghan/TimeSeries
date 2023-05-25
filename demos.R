@@ -607,7 +607,7 @@ main_demo <- function(x0, max_iter, n_series, p, g, K, var){
 }
 nn_predictions = main_demo(x_gappy, max_iter = 10, n_series = 40, p = 0.1, g = 2, K = 5, var = 0.05)
 
-
+## Plotting the original time series and imputed time series
 par(mfrow = c(1,1))
 plot(xt, type = 'l', lwd = 2); grid()
 lines(nn_predictions, type = 'l', col = 'red')
@@ -615,14 +615,15 @@ lines(xt, type = 'p', col = ifelse(is.na(x_gappy), 'dodgerblue', adjustcolor( "r
 legend('topleft', legend = c('True TS', 'Imputed TS', 'Missing Point'), 
        col = c('black', 'red', 'dodgerblue'), lty = c(1, 1, 0), pch = c(-1, -1, 1))
 
-
+## Computing the MSE of neural network imputer
 eval_performance(x = xt, X = nn_predictions, gappyx = x_gappy)$RMSE
 
-
-
+## For Example - imputing using HWI and LI and comparing results (MSE)
 x_hwi = parInterpolate(x_gapped, methods = 'HWI')[[1]]$HWI$p0.1$g2[[1]]
-eval_performance(x = xt, X = x_hwi, gappyx = x_gapped[[1]]$p0.1$g2[[1]])$RMSE
+x_li = parInterpolate(x_gapped, methods = 'LI')[[1]]$LI$p0.1$g2[[1]]
 
+eval_performance(x = xt, X = x_hwi, gappyx = x_gapped[[1]]$p0.1$g2[[1]])$RMSE
+eval_performance(x = xt, X = x_li, gappyx = x_gapped[[1]]$p0.1$g2[[1]])$RMSE
 
 
 
