@@ -81,8 +81,8 @@ estimator <- function(x){
 #' 
 preprocess <- function(x){
   for (i in 1:dim(x)[1]){
-    x[i,] = (x[i,] - min(x[i,], na.rm = TRUE)) / 
-            (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE)) ## Standardizing to the 0-1 scale
+    x[i,] = (0.999 - 0.001) * (x[i,] - min(x[i,], na.rm = TRUE)) / 
+            (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE)) + 0.001 ## Standardizing to the 0-1 scale
     x[i,] = ifelse(is.na(x[i,]), 0, x[i,]) ## Masking NA values
   }
   return(x)
@@ -529,7 +529,16 @@ main <- function(x0, max_iter, n_series, p, g, K, var){
 }
 
 
+set.seed(22)
+x = simXt(N = 100, numTrend = 0, numFreq = 2)$Xt
+plot(x, type = 'l', lwd = 1.5); grid()
 
+x_0 = simulateGaps(list(x), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
+x_i = initialize(x_0)
+x_est = estimator(x_i)
+lines(x_est, type = 'l', col = 'red', lwd = 0.5)
+
+plot(x-x_est, type = 'l', lwd = 1.5); grid()
 
 
 ## Comparing performance across methods:

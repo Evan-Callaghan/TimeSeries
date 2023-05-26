@@ -614,6 +614,7 @@ lines(nn_predictions, type = 'l', col = 'red')
 lines(xt, type = 'p', col = ifelse(is.na(x_gappy), 'dodgerblue', adjustcolor( "red", 0.01)))
 legend('topleft', legend = c('True TS', 'Imputed TS', 'Missing Point'), 
        col = c('black', 'red', 'dodgerblue'), lty = c(1, 1, 0), pch = c(-1, -1, 1))
+lines(x_li, col = 'green', type = 'l')
 
 ## Computing the MSE of neural network imputer
 eval_performance(x = xt, X = nn_predictions, gappyx = x_gappy)$RMSE
