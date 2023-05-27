@@ -515,6 +515,10 @@ main <- function(x0, max_iter, n_series, p, g, K, var){
 7. Repeat steps 2-6 using the output of Step 6 as the input for Step 2, each time storing the predictions.
 8. Return the final predictions as the average predictions over the total number of iterations. 
 
+## New Notes:
+A Fourier Series approximates any given function using a summation of sine and cosine functions with unique frequencies.
+A Fourier Transform allows use to go between the time domain and the frequency domain (specifically a time domian signal into a frequency domain signal), and an inverse Fourier transform does the opposite.
+
 \newpage
 
 ## Setup
