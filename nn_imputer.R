@@ -539,6 +539,7 @@ x_est = estimator(x_i)
 lines(x_est, type = 'l', col = 'red', lwd = 0.5)
 
 plot(x-x_est, type = 'l', lwd = 1.5); grid()
+mean(x-x_est)
 
 
 ## Comparing performance across methods:
