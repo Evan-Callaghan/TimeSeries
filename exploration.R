@@ -14,6 +14,8 @@ plot(x, type = 'l', lwd = 2); grid()
 
 
 
+
+
 plot.frequency.spectrum <- function(X.k, xlimits=c(0,length(X.k))){
   plot.data  <- cbind(0:(length(X.k)-1), Mod(X.k))
   
