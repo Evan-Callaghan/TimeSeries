@@ -22,13 +22,16 @@ x_inv = fft(ft, inverse = TRUE)
 plot(idx, x_inv, type = 'b', lwd = 2); grid()
 
 
+## Trying with noise
+w = rnorm(100,0,0.5) + sin(0:99); plot(0:99, w, type = 'l', lwd = 2); grid()
+f_w = fft(array(w), inverse = FALSE)
+plot(0:99, Mod(f_w)/length(w), type = 'h', lwd = 4); grid()
+
+
 spec.mtm(ts(x), plot = TRUE)
-
-
 spec <- spec.mtm(x, nw=5.0, k=8, plot=FALSE, deltat=1)
 acv <- SpecToACV(spec,maxlag=length(x))
 acv
-
 plot(acv, type = 'l')
 
 

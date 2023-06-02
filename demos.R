@@ -521,7 +521,7 @@ main <- function(x0, max_iter, n_series, p, g, K, var){
 set.seed(42)
 par(mfrow = c(1,1))
 xt = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
-xt = (xt - min(xt)) / (max(xt) - min(xt))
+#xt = (xt - min(xt)) / (max(xt) - min(xt))
 x_gapped = simulateGaps(list(xt), p = 0.1, g = 2, K = 1)
 x_gappy = x_gapped[[1]]$p0.1$g2[[1]]
 plot(xt, type = 'l', main = 'Demo Time Series'); grid()
@@ -553,9 +553,49 @@ step_2_demo <- function(xI){
   lines(Xt, type = 'l', col = 'red')
   legend('topleft', legend = c('Step 1 Output', 'Trend', 'Trend + Periodic'), 
          col = c('black', 'dodgerblue', 'red'), lty = 1, lwd = 2)
-  return(Xt)
+  return(xI - Xt)
 }
 step2 = step_2_demo(step1)
+
+time = 0:99
+Wt = step2
+plot(Wt, type = 'l', lwd = 2);grid()
+Wt_fft = fft(Wt)
+plot(time, abs(Wt_fft) / length(time), type = 'l'); grid()
+
+Wt_fft
+Re(Wt_fft)
+Im(Wt_fft)
+
+#### Solution::::::
+complex(modulus = 1, argument = runif(3, 0, 2*pi))
+####
+
+
+Arg(complex(real = c(1, 0), imaginary = c(1, 3)))
+
+pi/4
+pi/2
+
+a = 4+0i
+b = 2-5i
+
+a * b
+
+Mod(a)
+Mod(b)
+
+
+
+com = complex(length.out = length(time), 
+              real = seq(0, 0.99, length.out = 100), 
+              imaginary = runif(length(time), 0, 2*pi))
+
+Mod(com)
+
+complex(length.out = 10,
+        imaginary = runif(length(10), 0, 2*pi), 
+        modulus = 1)
 
 
 ## -----------------------
