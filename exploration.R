@@ -139,3 +139,72 @@ plot(idx, abs(f_filtered), type = 'h', lwd = 4)
 filtered <- fft(f_filtered,inverse=TRUE)/64
 plot(t, Re(filtered), type = "b")
 title("Time series after low-pass filter"); grid()
+
+
+## -------------------------------
+srate = 1000
+time = seq(0, 1, 1/srate)
+freq = 6
+i = complex(real = 0, imaginary = 1)
+
+realval_sine = sin(2*pi*freq*time)
+complex_sine = exp(i*2*pi*freq*time)
+
+par(mfrow = c(3,1))
+plot(time, realval_sine, type = 'l', lwd = 2, main = 'Real-Valued Sine'); grid()
+plot(time, Im(complex_sine), type = 'l', lwd = 2, col = 'blue',  main = 'Imaginary (sine) Component of Complex Sine'); grid()
+plot(time, Re(complex_sine), type = 'l', lwd = 2, col = 'red', main = 'Real (cosine) Component of Complex Sine'); grid()
+
+
+
+sine1 = 3 * cos(2*pi*freq*time + 0)
+sine2 = 2 * cos(2*pi*freq*time + pi/6)
+sine3 = 1 * cos(2*pi*freq*time + pi/3)
+
+fCoefs1 = fft(sine1) / length(time)
+fCoefs2 = fft(sine2) / length(time)
+fCoefs3 = fft(sine3) / length(time)
+
+hz = seq(0, srate/2, 1/(floor(length(time)/2) + 1))
+
+
+
+plot(time, sine1, type = 'l')
+sine1_fft = fft(sine1)
+plot(time, abs(sine1_fft) / length(time), type = 'l', xlim = c(0, 0.02))
+
+1i
+
+
+## ---------------------------
+
+# If y <- fft(z), then z is fft(y, inverse = TRUE) / length(y)
+
+x <- 1:4
+fft(fft(x), inverse = TRUE) / length(x)
+all(fft(fft(x), inverse = TRUE)/(x*length(x)) == 1+0i)
+
+eps <- 1e-11 ## In general, not exactly, but still:
+for(N in 1:130) {
+  cat("N=",formatC(N,wid=3),": ")
+  x <- rnorm(N)
+  if(N %% 5 == 0) {
+    m5 <- matrix(x,ncol=5)
+    cat("mvfft:",all(apply(m5,2,fft) == mvfft(m5)),"")
+  }
+  dd <- Mod(1 - (f2 <- fft(fft(x), inverse=TRUE)/(x*length(x))))
+  cat(if(all(dd < eps))paste(" all < ", formatC(eps)) else
+    paste("NO: range=",paste(formatC(range(dd)),collapse=",")),"\n")
+}
+
+plot(fft(c(9:0,0:13, numeric(301))), type = "l")
+periodogram <- function(x, mean.x = mean(x)) { # simple periodogram
+  n <- length(x)
+  x <- unclass(x) - mean.x
+  Mod(fft(x))[2:(n%/%2 + 1)]^2 / (2*pi*n) # drop I(0)
+}
+data(sunspots)
+plot(10*log10(periodogram(sunspots)), type = "b", col = "blue")
+
+
+

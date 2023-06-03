@@ -572,6 +572,18 @@ complex(modulus = 1, argument = runif(3, 0, 2*pi))
 ####
 
 
+a = complex(modulus = 1, argument = runif(3, 0, 2*pi))
+b = complex(modulus = 1, argument = runif(3, 0, 2*pi))
+a
+b
+a * b
+Mod(a)
+Mod(b)
+Mod(a * b)
+
+a * b
+
+
 Arg(complex(real = c(1, 0), imaginary = c(1, 3)))
 
 pi/4
