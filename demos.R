@@ -63,13 +63,13 @@ estimator_demo <- function(x, main_demo = FALSE){
 #' the neural network).
 #' @param x {matrix}; Matrix object containing a time series in each row
 #' 
-preprocess_demo <- function(x){
-  for (i in 1:dim(x)[1]){
-    x[i,] = (0.999 - 0.001) * (x[i,] - min(x[i,], na.rm = TRUE)) / 
-      (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE)) + 0.001 ## Standardizing to the 0-1 scale
-    x[i,] = ifelse(is.na(x[i,]), 0, x[i,]) ## Masking NA values
+preprocess_demo <- function(inputs, targets){
+  for (i in 1:dim(inputs)[1]){
+    inputs[i,] = (inputs[i,] - min(targets[i,])) / (max(targets[i,]) - min(targets[i,])) ## Standardizing to the 0-1 scale
+    targets[i,] = (targets[i,] - min(targets[i,])) / (max(targets[i,]) - min(targets[i,]))
+    #x[i,] = ifelse(is.na(x[i,]), 0, x[i,]) ## Masking NA values
   }
-  return(x)
+  return(list(inputs, targets))
 }
 
 
@@ -86,24 +86,47 @@ preprocess_demo <- function(x){
 #' @param g {integer}; Gap width of missing data to be applied to the simulated series
 #' @param K {integer}; Number of output series with a unique gap structure for each simulated series
 #' 
-simulator_demo <- function(x, n_series, var, p, g, K){
+simulator_demo <- function(x0, x, w, n_series, p, g, K, random = TRUE){
+  if (random == FALSE){K = 1}
   N = length(x); M = n_series * K ## Defining useful parameters
-  inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
+  maximum = max(x0, na.rm = TRUE); minimum = min(x0, na.rm = TRUE)
   
-  for (i in 1:n_series){
-    x_p = x + rnorm(1, 0, var) + rnorm(N, 0, var) ## Creating small perturbation
-    x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
+  inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
+  w = fft(w, inverse = FALSE) ## Converting noise to frequency domain
+  
+  if (random == TRUE){
+    for (i in 1:n_series){
+      w_p = w * complex(modulus = 1, argument = runif(N, 0, 2*pi)) ## Creating small perturbation
+      w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+      x_p = x + w_t ## Adding perturbed noise back to trend and periodic
+      x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
+      
+      for (k in 1:K){
+        structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
+        inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+        targets_temp = c(targets_temp, x_p) ## Appending targets
+      }
+    }
+  }
+  
+  else if (random == FALSE){
+    g_idx = which(is.na(x0)) ## Defining useful parameters
     
-    for (k in 1:K){
-      structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
-      inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+    for (i in 1:n_series){
+      w_p = w * complex(modulus = 1, argument = runif(100, 0, 2*pi)) ## Creating small perturbation
+      w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+      x_p = x + w_t ## Adding perturbed noise back to trend and periodic
+      x_g = x_p; x_g[g_idx] = NA ## Imposing non-randomized gap structure
+      inputs_temp = c(inputs_temp, x_g) ## Appending inputs
       targets_temp = c(targets_temp, x_p) ## Appending targets
     }
   }
+  
   inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting inputs
   targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting targets
-  inputs = preprocess_demo(inputs) ## Preprocessing inputs
-  targets = preprocess_demo(targets) ## Preprocessing targets
+  
+  preprocessed = preprocess_demo(inputs, targets) ## Preprocessing
+  inputs = preprocessed[[1]]; targets = preprocessed[[2]]
   return(list(inputs, targets))
 }
 
@@ -521,7 +544,7 @@ main <- function(x0, max_iter, n_series, p, g, K, var){
 set.seed(42)
 par(mfrow = c(1,1))
 xt = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
-#xt = (xt - min(xt)) / (max(xt) - min(xt))
+xt = (xt - min(xt)) / (max(xt) - min(xt))
 x_gapped = simulateGaps(list(xt), p = 0.1, g = 2, K = 1)
 x_gappy = x_gapped[[1]]$p0.1$g2[[1]]
 plot(xt, type = 'l', main = 'Demo Time Series'); grid()
@@ -553,13 +576,46 @@ step_2_demo <- function(xI){
   lines(Xt, type = 'l', col = 'red')
   legend('topleft', legend = c('Step 1 Output', 'Trend', 'Trend + Periodic'), 
          col = c('black', 'dodgerblue', 'red'), lty = 1, lwd = 2)
-  return(xI - Xt)
+  return(list(Xt, xI - Xt))
 }
 step2 = step_2_demo(step1)
 
+Xt = step2[[1]]
+Wt = step2[[2]]
+
+options(warn=-1)
+
+step3 = simulator_demo(x_gappy, Xt, Wt, n_series = 3, p = 0.1, g = 2, K = 1, random = TRUE)
+inputs = step3[[1]]
+targets = step3[[2]]
+
+par(mfrow = c(1,1))
+plot(xt, type = 'l', main = 'Demo Time Series', lwd = 2); grid()
+lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
+
+
+lines(targets[1,], type = 'l', col = 'red', lwd = 0.5)
+lines(which(is.na(inputs[1,])), targets[1, is.na(inputs[1,])], type = 'p', col = 'black', pch = 21, bg = 'red', cex = 0.7)
+
+lines(targets[2,], type = 'l', col = 'green', lwd = 0.5)
+lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', pch = 21, bg = 'green', cex = 0.7)
+
+lines(targets[3,], type = 'l', col = 'cyan', lwd = 0.5)
+lines(which(is.na(inputs[3,])), targets[3, is.na(inputs[3,])], type = 'p', col = 'black', pch = 21, bg = 'cyan', cex = 0.7)
+
+
+which(is.na(x_gappy))
+
+
+
+
+
+
+
+
 time = 0:99
 Wt = step2
-plot(Wt, type = 'l', lwd = 2);grid()
+plot(time, Wt, type = 'l', lwd = 2); grid()
 Wt_fft = fft(Wt)
 plot(time, abs(Wt_fft) / length(time), type = 'l'); grid()
 
@@ -568,47 +624,34 @@ Re(Wt_fft)
 Im(Wt_fft)
 
 #### Solution::::::
-complex(modulus = 1, argument = runif(3, 0, 2*pi))
+complex(modulus = 1, argument = runif(100, 0, 2*pi))
 ####
 
+set.seed(42)
+Wt_p = Wt_fft * complex(modulus = 1, 
+                        argument = runif(100, 0, 2*pi))
+
+#plot(time, Mod(Wt_fft), type = 'l'); grid()
+#lines(time, Mod(Wt_p), type = 'l', col = 'red')
 
 
-a = complex(modulus = 1, argument = runif(3, 0, 2*pi))
-b = complex(modulus = 1, argument = runif(3, 0, 2*pi))
-a
-b
-a * b
-Mod(a)
-Mod(b)
-Mod(a * b)
-
-a * b
-
-
-Arg(complex(real = c(1, 0), imaginary = c(1, 3)))
-
-pi/4
-pi/2
-
-a = 4+0i
-b = 2-5i
-
-a * b
-
-Mod(a)
-Mod(b)
+lines(time, as.numeric(fft(Wt_fft, inverse = TRUE)) / length(time), type = 'l', col = 'cyan', lty = 2, lwd = 0.5); grid()
+lines(time, fft(Wt_p, inverse = TRUE) / length(time), type = 'l', col = 'red')
 
 
 
-com = complex(length.out = length(time), 
-              real = seq(0, 0.99, length.out = 100), 
-              imaginary = runif(length(time), 0, 2*pi))
 
-Mod(com)
 
-complex(length.out = 10,
-        imaginary = runif(length(10), 0, 2*pi), 
-        modulus = 1)
+
+
+
+
+
+
+
+
+
+
 
 
 ## -----------------------

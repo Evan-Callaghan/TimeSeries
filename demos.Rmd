@@ -53,15 +53,15 @@ estimator_demo <- function(x, main_demo = FALSE){
 #' Function to preprocess the data before building the neural network imputer. The function performs 0-1
 #' standardization for each time series in the input matrix and masks NA values with 0 (necessary for 
 #' the neural network).
-#' @param x {matrix}; Matrix object containing a time series in each row
+#' @param inputs {matrix}; Matrix object containing a time series in each row (includes NAs)
+#' @param targets {matrix}; Matrix object containing a time series in each row (excludes NAs)
 #' 
-preprocess_demo <- function(x){
-  for (i in 1:dim(x)[1]){
-    x[i,] = (0.999 - 0.001) * (x[i,] - min(x[i,], na.rm = TRUE)) / 
-      (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE)) + 0.001 ## Standardizing to the 0-1 scale
-    x[i,] = ifelse(is.na(x[i,]), 0, x[i,]) ## Masking NA values
+preprocess_demo <- function(inputs, targets){
+  for (i in 1:dim(inputs)[1]){
+    inputs[i,] = (inputs[i,] - min(targets[i,])) / (max(targets[i,]) - min(targets[i,])) 
+    targets[i,] = (targets[i,] - min(targets[i,])) / (max(targets[i,]) - min(targets[i,]))
   }
-  return(x)
+  return(list(inputs, targets))
 }
 
 
@@ -71,33 +71,63 @@ preprocess_demo <- function(x){
 #' structure of the original time series. With each new series, a specified gap structure is 
 #' imposed and returned are two data matrices: one with missing gaps (inputs) and one that is
 #' complete (targets). Completes the third and fourth steps of the designed algorithm.
+#' @param x0 {list}; List object containing the original gappy time series 
 #' @param x {list}; List object containing a complete time series 
+#' @param w {list}; List object containing a complete time series of residual noise
 #' @param n_series {integer}; Number of new time series to construct
-#' @param var {float}; Variance for perturbations
 #' @param p {flaot}; Proportion of missing data to be applied to the simulated series
 #' @param g {integer}; Gap width of missing data to be applied to the simulated series
 #' @param K {integer}; Number of output series with a unique gap structure for each simulated series
+#' @param random {boolean}; Whether or not to apply random indexing for gap structure (default: TRUE)
 #' 
-simulator_demo <- function(x, n_series, var, p, g, K){
+simulator_demo <- function(x0, x, w, n_series, p, g, K, random = TRUE){
+  if (random == FALSE){K = 1}
   N = length(x); M = n_series * K ## Defining useful parameters
   inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
+  w = fft(w, inverse = FALSE) ## Converting noise to frequency domain
   
-  for (i in 1:n_series){
-    x_p = x + rnorm(1, 0, var) + rnorm(N, 0, var) ## Creating small perturbation
-    x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
-    
-    for (k in 1:K){
-      structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
-      inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+  if (random == TRUE){
+    for (i in 1:n_series){
+      w_p = w * complex(modulus = 1, argument = runif(N, 0, 2*pi)) ## Creating small perturbation
+      w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+      x_p = x + w_t ## Adding perturbed noise back to trend and periodic
+      x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
+      
+      for (k in 1:K){
+        structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
+        inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+        targets_temp = c(targets_temp, x_p) ## Appending targets
+      }
+    }
+  }
+  
+  else if (random == FALSE){
+    g_index = which(is.na(x0)) ## Defining useful parameters
+    for (i in 1:n_series){
+      w_p = w * complex(modulus = 1, argument = runif(100, 0, 2*pi)) ## Creating small perturbation
+      w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+      x_p = x + w_t ## Adding perturbed noise back to trend and periodic
+      x_g = x_p; x_g[g_index] = NA ## Imposing non-randomized gap structure
+      inputs_temp = c(inputs_temp, x_g) ## Appending inputs
       targets_temp = c(targets_temp, x_p) ## Appending targets
     }
   }
+  
   inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting inputs
   targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting targets
-  inputs = preprocess_demo(inputs) ## Preprocessing inputs
-  targets = preprocess_demo(targets) ## Preprocessing targets
+  preprocessed = preprocess_demo(inputs, targets) ## Preprocessing
+  inputs = preprocessed[[1]]; targets = preprocessed[[2]]
   return(list(inputs, targets))
 }
+
+
+
+
+## ------------------------------
+## Need to update:
+
+
+
 
 
 #' impute
@@ -507,17 +537,13 @@ main <- function(x0, max_iter, n_series, p, g, K, var){
 1. Interpolate missing values in the original time series using linear interpolation.
 2. a. Estimate the trend component of the input time series
    b. Estimate the periodic component(s) of the input time series
-3. Simulate a sufficient number of time series with the same trend and periodic structure     by applying small perturbations (targets). 
+3. Simulate a sufficient number of time series with the same trend and periodic structure by applying small perturbations (targets). 
 4. Impose a gap structure on the simulated time series (i.e., the same gap structure as 
-   observed in the original time series) and produce K unique ‘gappy’ time series         (inputs).
+   observed in the original time series) and produce K unique ‘gappy’ time series (inputs).
 5. Construct, compile, and fit a neural network autoencoder model using the newly created input and target time series. Using the autoencoder, predict on the original time series.
 6. Extract the predicted values of the missing data points to complete the original time series. 
 7. Repeat steps 2-6 using the output of Step 6 as the input for Step 2, each time storing the predictions.
 8. Return the final predictions as the average predictions over the total number of iterations. 
-
-## New Notes:
-A Fourier Series approximates any given function using a summation of sine and cosine functions with unique frequencies.
-A Fourier Transform allows use to go between the time domain and the frequency domain (specifically a time domian signal into a frequency domain signal), and an inverse Fourier transform does the opposite.
 
 \newpage
 
@@ -576,9 +602,11 @@ step_2_demo <- function(xI){
   lines(Mt, type = 'l', col = 'dodgerblue'); lines(Xt, type = 'l', col = 'red')
   legend('topleft', legend = c('Step 1 Output', 'Trend', 'Trend + Periodic'), lty = 1, 
          lwd = 2, col = c('black', 'dodgerblue', 'red'), cex = 0.7)
-  return(Xt)
+  return(list(Xt, xI - Xt))
 }
 step2 = step_2_demo(step1)
+step2_x = step2[[1]]
+step2_w = step2[[2]]
 ```
 
 
@@ -586,24 +614,61 @@ step2 = step_2_demo(step1)
 
 The next steps are to generate an appropriate number of time series with the same trend and periodic structure by applying small perturbations to the output of step 2 and then imposing a gap structure similar to that of the original input time series.
 
-```{r demo3, fig.align='center', fig.dim=c(6,10)}
-step_34_demo <- function(x_est, n_series, var, p, g, K){
-  x = simulator_demo(x_est, n_series, var, p, g, K)
-  inputs = x[[1]]; targets = x[[2]]
-  par(mfcol=c(3,1), mar = c(5.1, 4.1, 1, 2.1))
-  x_est_scaled = (x_est - min(x_est)) / (max(x_est) - min(x_est))
-  for (i in 1:3){
-    plot(targets[i,], type = 'l', col = 'dodgerblue', lwd = 2, ylab = 'xt', 
-         main = paste0('Simulated Time Series ', i, ' (K = 1)')); 
-    lines(x_est_scaled, type = 'l', col = 'black'); grid()
-    lines(targets[i,], type = 'p', cex = 1.5,
-          col = ifelse(inputs[i,] == 0, 'red', adjustcolor( "red", 0.01)))
-    legend('topleft', legend = c('Estimated TS', 'Perturbed TS', 'Missing Points'), cex = 0.7,
-           pch = c(-1, -1, 1), lty = c(1, 1, 0), col = c('black', 'dodgerblue', 'red'))
-  }
-  return(x)
+```{r demo3, fig.align='center', fig.dim=c(10,6), echo = FALSE}
+step_3_4_demo <- function(x0, x, w){
+  
+  options(warn=-1)
+  step3 = simulator_demo(x0, x, w, n_series = 3, p = 0.1, g = 2, K = 1, random = TRUE)
+  inputs = step3[[1]]; targets = step3[[2]]
+  
+  par(mfrow = c(1,1))
+  plot(xt, type = 'l', main = 'Demo Time Series (Random = TRUE)', lwd = 2); grid()
+  lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
+
+  lines(targets[1,], type = 'l', col = 'red', lwd = 0.5)
+  lines(which(is.na(inputs[1,])), targets[1, is.na(inputs[1,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'red', cex = 0.7)
+  
+  lines(targets[2,], type = 'l', col = 'green', lwd = 0.5)
+  lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'green', cex = 0.7)
+  
+  lines(targets[3,], type = 'l', col = 'dodgerblue', lwd = 0.5)
+  lines(which(is.na(inputs[3,])), targets[3, is.na(inputs[3,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'dodgerblue', cex = 0.7)
+  
+  return(list(inputs, targets))
 }
-step34 = step_34_demo(step2, n_series = 3, var = 0.05, p = 0.1, g = 2, K = 1)
-inputs = step34[[1]]; targets = step34[[2]]
+
+step3_4 = step_3_4_demo(x_gappy, step2_x, step2_w)
+```
+
+```{r demo3b, fig.align='center', fig.dim=c(10,6), echo = FALSE}
+step_3_4_demo <- function(x0, x, w){
+  
+  options(warn=-1)
+  step3 = simulator_demo(x0, x, w, n_series = 3, p = 0.1, g = 2, K = 1, random = FALSE)
+  inputs = step3[[1]]; targets = step3[[2]]
+  
+  par(mfrow = c(1,1))
+  plot(xt, type = 'l', main = 'Demo Time Series (Random = FALSE)', lwd = 2); grid()
+  lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
+
+  lines(targets[1,], type = 'l', col = 'red', lwd = 0.5)
+  lines(which(is.na(inputs[1,])), targets[1, is.na(inputs[1,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'red', cex = 0.7)
+  
+  lines(targets[2,], type = 'l', col = 'green', lwd = 0.5)
+  lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'green', cex = 0.7)
+  
+  lines(targets[3,], type = 'l', col = 'dodgerblue', lwd = 0.5)
+  lines(which(is.na(inputs[3,])), targets[3, is.na(inputs[3,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'dodgerblue', cex = 0.7)
+  
+  return(list(inputs, targets))
+}
+
+step3_4 = step_3_4_demo(x_gappy, step2_x, step2_w)
 ```
 
