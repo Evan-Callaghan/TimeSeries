@@ -537,71 +537,80 @@ main <- function(x0, max_iter, n_series, p, g, K, var){
 1. Interpolate missing values in the original time series using linear interpolation.
 2. a. Estimate the trend component of the input time series
    b. Estimate the periodic component(s) of the input time series
-3. Simulate a sufficient number of time series with the same trend and periodic structure by applying small perturbations (targets). 
-4. Impose a gap structure on the simulated time series (i.e., the same gap structure as 
-   observed in the original time series) and produce K unique ‘gappy’ time series (inputs).
-5. Construct, compile, and fit a neural network autoencoder model using the newly created input and target time series. Using the autoencoder, predict on the original time series.
+3. Simulate a sufficient number of time series with the same trend and periodic structure by applying small perturbations to the residual noise in the frequency domain representation (will become neural network targets). 
+4. Impose a gap structure on the simulated time series (i.e., the same gap structure as observed in the original time series) and produce K unique ‘gappy’ time series (will become neural network inputs).
+5. Construct, compile, and fit a neural network 'autoencoder' model using the newly created input and target time series. Using the autoencoder, predict on the original time series.
 6. Extract the predicted values of the missing data points to complete the original time series. 
 7. Repeat steps 2-6 using the output of Step 6 as the input for Step 2, each time storing the predictions.
-8. Return the final predictions as the average predictions over the total number of iterations. 
+8. Return the final predictions as the average prediction over the total number of specified iterations. 
 
 \newpage
 
-## Setup
+## Setup Steps:
+
+The Neural Network Imputer relies on these four libraries specifically:
 
 ```{r setup2, message = FALSE}
-## Importing libraries
 library(tsinterp)
 library(interpTools)
 library(tensorflow)
 library(keras)
 ```
 
-```{r setup3, message=FALSE, warning=FALSE, fig.align='center', fig.dim=c(6,4)}
+We can simulate a time series and go through the algorithm to visualize what is happening in each step of the process. 
+
+```{r setup3, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
 ## Defining the time series for demo
 set.seed(42)
 xt = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
 xt = (xt - min(xt)) / (max(xt) - min(xt))
-x_gapped = simulateGaps(list(xt), p = 0.1, g = 2, K = 1)
-x_gappy = x_gapped[[1]]$p0.1$g2[[1]]
-plot(xt, type = 'l', main = 'Demo Time Series'); grid()
-lines(xt, type = 'p', col = ifelse(is.na(x_gappy), 'dodgerblue', 'black'), cex = 0.8)
-legend('topleft', legend = c('Observed', 'Missing'), col = c('black', 'dodgerblue'), 
-       pch = 1, cex = 0.7)
+x_gapped = simulateGaps(list(xt), p = 0.1, g = 1, K = 1)
+x_gappy = x_gapped[[1]]$p0.1$g1[[1]]
+plot(xt, type = 'l', main = 'Original Time Series', xlab = 'Time', ylab = 'X', lwd = 2); grid()
+lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'red')
+legend('topleft', legend = c('Missing Data Point'), col = 'red', pch = 16, cex = 1.2)
 ```
 
 \newpage
 
-## Demo 1: Initialization Step
+## Initialization Step:
 
 The first step of the algorithm is to use linear imputation to fill in the gaps for the original input time series.
 
-```{r demo1, fig.align='center', fig.dim=c(6,4)}
+```{r demo1, fig.align='center', fig.dim=c(8,5), echo = FALSE}
 step_1_demo <- function(x0){
   xI = initialize_demo(x0)
-  plot(xI, type = 'l', main = 'Demo Time Series', ylab = 'xt', col = 'red'); grid()
-  lines(xt, type = 'l')
-  lines(xt, type = 'p', col = ifelse(is.na(x_gappy), 'dodgerblue', 'black'), cex = 0.8)
-  legend('topleft', legend = c('Observed', 'Missing', 'Lin. Imputation'),  lty = c(0, 0, 1), 
-         col = c('black', 'dodgerblue', 'red'), pch = c(1, 1, -1), cex = 0.7)
+  
+  plot(xI, type = 'l', main = 'Original Time Series w/ Linear Imp.', xlab = 'Time', ylab = 'X', col = 'red', lwd = 1)
+  lines(xt, type = 'l', lwd = 2); grid()
+  lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'red')
+  legend('topleft', legend = c('Missing Data Point', 'Linear Imp.'), col = c('red', 'red'), 
+         cex = 1.2, lty = c(NA, 1), pch = c(16, NA))
+
   return(xI)
 }
 step1 = step_1_demo(x_gappy)
 ```
 
+\newpage
 
-## Demo 2: Trend and Periodic Estimation
+## Trend and Periodic Estimation:
 
-The next step of the algorithm is to use functions from Wesley's TSinterp package to estimate the trend and periodic components of the input time series.
+The next step of the algorithm is to use functions from the TSinterp package to estimate the trend and periodic components of the input time series. This step returns the trend + periodic series, as well as the residual noise. 
 
-```{r demo2, fig.align='center', fig.dim=c(6,4)}
+```{r demo2, fig.align='center', fig.dim=c(8,9), echo=FALSE}
 step_2_demo <- function(xI){
   x_est = estimator_demo(xI)
   Mt = x_est[[1]]; Tt = x_est[[2]]; Xt = x_est[[3]]
-  plot(xI, type = 'l', main = 'Demo Time Series', ylab = 'xt'); grid()
-  lines(Mt, type = 'l', col = 'dodgerblue'); lines(Xt, type = 'l', col = 'red')
-  legend('topleft', legend = c('Step 1 Output', 'Trend', 'Trend + Periodic'), lty = 1, 
-         lwd = 2, col = c('black', 'dodgerblue', 'red'), cex = 0.7)
+  
+  par(mfrow = c(2,1))
+  plot(xI, type = 'l', main = 'Estimated Trend + Periodic', xlab = 'Time', ylab = 'X', lwd = 2)
+  lines(Xt, type = 'l', col = 'dodgerblue', lty = 1, lwd = 1); grid()
+  legend('topleft', legend = c('Linear Imp.', 'Trend + Periodic'), lty = 1, 
+         lwd = 2, col = c('black', 'dodgerblue'), cex = 1.2)
+  
+  plot(xI - Xt, type = 'l', col = 'darkorange', lwd = 2, main = 'Residual Noise', ylab = 'W', xlab = 'Time')
+  grid()
   return(list(Xt, xI - Xt))
 }
 step2 = step_2_demo(step1)
@@ -609,66 +618,66 @@ step2_x = step2[[1]]
 step2_w = step2[[2]]
 ```
 
+\newpage
 
-## Demo 3/4: Time Series Simulation
+## Time Series Simulation:
 
-The next steps are to generate an appropriate number of time series with the same trend and periodic structure by applying small perturbations to the output of step 2 and then imposing a gap structure similar to that of the original input time series.
+The next steps are to generate an appropriate number of time series with the same trend and periodic structure by applying small perturbations to the residual noise in the frequency domain and then inverting it back into the time domain. Next, we impose a gap structure similar to that of the original input time series. The gap structure is the same, but there is a parameter which indicates whether or not the placement of the gaps is randomized. 
 
-```{r demo3, fig.align='center', fig.dim=c(10,6), echo = FALSE}
-step_3_4_demo <- function(x0, x, w){
+```{r demo3, fig.align='center', fig.dim=c(8,9), echo = FALSE}
+step_3_4_demo <- function(x0, xI, x, w){
   
   options(warn=-1)
-  step3 = simulator_demo(x0, x, w, n_series = 3, p = 0.1, g = 2, K = 1, random = TRUE)
+  step3 = simulator_demo(x0, x, w, n_series = 2, p = 0.1, g = 1, K = 1, random = TRUE)
   inputs = step3[[1]]; targets = step3[[2]]
   
-  par(mfrow = c(1,1))
-  plot(xt, type = 'l', main = 'Demo Time Series (Random = TRUE)', lwd = 2); grid()
-  lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
+  par(mfrow = c(2,1))
+  plot(xI, type = 'l', main = 'Simulated Time Series (Random = TRUE)', xlab = 'Time', ylab = 'X', lwd = 2); grid()
+  lines(which(is.na(x_gappy)), xI[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
 
-  lines(targets[1,], type = 'l', col = 'red', lwd = 0.5)
+  lines(targets[1,], type = 'l', col = 'green', lwd = 0.5)
   lines(which(is.na(inputs[1,])), targets[1, is.na(inputs[1,])], type = 'p', col = 'black', 
-        pch = 21, bg = 'red', cex = 0.7)
-  
-  lines(targets[2,], type = 'l', col = 'green', lwd = 0.5)
-  lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', 
         pch = 21, bg = 'green', cex = 0.7)
   
-  lines(targets[3,], type = 'l', col = 'dodgerblue', lwd = 0.5)
-  lines(which(is.na(inputs[3,])), targets[3, is.na(inputs[3,])], type = 'p', col = 'black', 
-        pch = 21, bg = 'dodgerblue', cex = 0.7)
+  lines(targets[2,], type = 'l', col = 'red', lwd = 0.5)
+  lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'red', cex = 0.7)
+  
+  legend('topleft', legend = c('Linear Imp.', 'Simulated', 'Simulated', 'Missing Index'), 
+         lty = c(1, 1, 1, NA), pch = c(NA, NA, NA, 1), cex = 1, lwd = c(2, 2, 2, 2),
+         col = c('black', 'green', 'red', 'black'))
+  
+  
+  
+  
+
+  step3 = simulator_demo(x0, x, w, n_series = 2, p = 0.1, g = 1, K = 1, random = FALSE)
+  inputs = step3[[1]]; targets = step3[[2]]
+  
+  plot(xI, type = 'l', main = 'Simulated Time Series (Random = FALSE)', xlab = 'Time', ylab = 'X', lwd = 2); grid()
+  lines(which(is.na(x_gappy)), xI[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
+
+  lines(targets[1,], type = 'l', col = 'green', lwd = 0.5)
+  lines(which(is.na(inputs[1,])), targets[1, is.na(inputs[1,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'green', cex = 0.7)
+  
+  lines(targets[2,], type = 'l', col = 'red', lwd = 0.5)
+  lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', 
+        pch = 21, bg = 'red', cex = 0.7)
+  
+  legend('topleft', legend = c('Linear Imp.', 'Simulated', 'Simulated', 'Missing Index'), 
+         lty = c(1, 1, 1, NA), pch = c(NA, NA, NA, 1), cex = 1, lwd = c(2, 2, 2, 2),
+         col = c('black', 'green', 'red', 'black'))
   
   return(list(inputs, targets))
 }
 
-step3_4 = step_3_4_demo(x_gappy, step2_x, step2_w)
+step3_4 = step_3_4_demo(x_gappy, step1, step2_x, step2_w)
 ```
 
-```{r demo3b, fig.align='center', fig.dim=c(10,6), echo = FALSE}
-step_3_4_demo <- function(x0, x, w){
-  
-  options(warn=-1)
-  step3 = simulator_demo(x0, x, w, n_series = 3, p = 0.1, g = 2, K = 1, random = FALSE)
-  inputs = step3[[1]]; targets = step3[[2]]
-  
-  par(mfrow = c(1,1))
-  plot(xt, type = 'l', main = 'Demo Time Series (Random = FALSE)', lwd = 2); grid()
-  lines(which(is.na(x_gappy)), xt[is.na(x_gappy)], type = 'p', col = 'black', pch = 21, bg = 'black')
+\newpage
 
-  lines(targets[1,], type = 'l', col = 'red', lwd = 0.5)
-  lines(which(is.na(inputs[1,])), targets[1, is.na(inputs[1,])], type = 'p', col = 'black', 
-        pch = 21, bg = 'red', cex = 0.7)
-  
-  lines(targets[2,], type = 'l', col = 'green', lwd = 0.5)
-  lines(which(is.na(inputs[2,])), targets[2, is.na(inputs[2,])], type = 'p', col = 'black', 
-        pch = 21, bg = 'green', cex = 0.7)
-  
-  lines(targets[3,], type = 'l', col = 'dodgerblue', lwd = 0.5)
-  lines(which(is.na(inputs[3,])), targets[3, is.na(inputs[3,])], type = 'p', col = 'black', 
-        pch = 21, bg = 'dodgerblue', cex = 0.7)
-  
-  return(list(inputs, targets))
-}
+## Noise Perturbation Process:
 
-step3_4 = step_3_4_demo(x_gappy, step2_x, step2_w)
-```
+
 
