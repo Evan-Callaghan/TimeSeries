@@ -679,5 +679,73 @@ step3_4 = step_3_4_demo(x_gappy, step1, step2_x, step2_w)
 
 ## Noise Perturbation Process:
 
+1. Subtract the estimated trend + periodic series from the linear imputed series to form the residual noise series.
 
+2. Convert the residual noise series to the frequency domain using the fft() function.
 
+3. The output of the fft() function is a vector of complex numbers with length $N$. To perform the perturbation, generate another vector of length $N$ with complex values of amplitude 1 and phase somewhere between $(0, 2 \pi)$.
+
+4. Multiply the two complex vectors. This applies a small perturbation to the original residual noise in the frequency domain.
+
+5. Convert the output of Step 4 back into the time domain and add it to the trend + periodic series. 
+
+6. This has created one time series which will be an element of the neural network training data. Repeat this process enough times as to generate a sufficient set of training data. 
+
+\newpage
+
+```{r noise_process, fig.align='center', fig.dim=c(8,8)}
+
+## Generate a time series
+Xt = simXt(N = 100, mu = 0, numTrend = 0, numFreq = 2)$Xt
+
+## Estimate trend + periodic and noise components
+estimate = estimator_demo(Xt)
+Mt = estimate[[1]]; Tt = estimate[[2]]; Wt = Xt - Mt - Tt;
+
+## Converting the residual noise series to the frequency domain
+Wt_freq = fft(Wt)
+```
+
+```{r noise_processb, fig.align='center', fig.dim=c(8,8), echo = FALSE}
+## Plotting the residual noise and frequency
+par(mfrow = c(2,1))
+plot(0:99, Wt, type = 'l', col = 'darkorange', lwd = 2, main = 'Residual Noise', 
+     ylab = 'Wt', xlab = 'Time'); grid()
+plot(0:99, Mod(Wt_freq) / length(Wt), type='h', lwd = 4, xlab = 'Frequency', ylab = 'Amplitude', 
+     main = 'Frequency (FFT Transform)'); grid()
+```
+
+\newpage
+
+```{r noise_processc}
+## Generating new vector and multiplying the two complex vectors 
+Wt_freq_p = Wt_freq * complex(modulus = 1, argument = runif(100, 0, 2*pi))
+
+## Converting perturbation back into time domain
+Wt_p = fft(Wt_freq_p, inverse = TRUE) / length(Wt)
+```
+
+```{r noise_processd, fig.align='center', fig.dim=c(8,5), echo = FALSE}
+## Plotting the residual noise and frequency
+par(mfrow = c(1,1))
+plot(0:99, Wt, type = 'l', col = 'darkorange', lwd = 2, main = 'Noise in Time Domain', 
+     ylab = 'Wt', xlab = 'Time', ylim = c(-0.5, 0.5)); grid()
+lines(0:99, Wt_p, type = 'l', lwd = 1, col = 'dodgerblue4'); grid()
+legend('topleft', legend = c('Residual Noise', 'Perturbed Noise'), lty = 1, cex = 1, lwd = 2,
+         col = c('darkorange', 'dodgerblue4'))
+```
+
+\newpage
+
+```{r noise_processe}
+## Adding the perturbed noise to the trend and periodic estimations
+Xt_p = Mt + Tt + Wt_p
+```
+
+```{r noise_processf, fig.align='center', fig.dim=c(8,5), echo = FALSE}
+plot(0:99, Xt, type = 'l', col = 'black', lwd = 2, main = 'Final Simulation of One Input Series', 
+     ylab = 'Xt', xlab = 'Time', ylim = c(-1, 1)); grid()
+lines(0:99, Xt_p, type = 'l', lwd = 1, col = 'chartreuse3')
+legend('topleft', legend = c('Original', 'Simulated'), lty = 1, cex = 1, lwd = 2,
+         col = c('black', 'chartreuse3'))
+```
