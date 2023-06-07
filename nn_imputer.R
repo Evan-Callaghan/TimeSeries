@@ -58,7 +58,7 @@ initialize <- function(x0){
 #' estimator
 #' 
 #' Function to estimate the trend and periodic components of a given time series. Completes the second 
-#' step of the designed algorithm.
+#' step of the designed algorithm. Returns the estimated trend + periodic series.
 #' @param x {list}; List object containing a complete time series
 #' 
 estimator <- function(x){
@@ -75,17 +75,20 @@ estimator <- function(x){
 #' preprocess
 #' 
 #' Function to preprocess the data before building the neural network imputer. The function performs 0-1
-#' standardization for each time series in the input matrix and masks NA values with 0 (necessary for 
-#' the neural network).
-#' @param x {matrix}; Matrix object containing a time series in each row
+#' standardization for each time series in the input and target matrix.
+#' @param inputs {matrix}; Matrix object containing the input training data (i.e., an incomplete 
+#'                         time series in each row)
+#' @param targets {matrix}; Matrix object containing the target training data (i.e., a complete 
+#'                         time series in each row)
 #' 
-preprocess <- function(x){
-  for (i in 1:dim(x)[1]){
-    x[i,] = (0.999 - 0.001) * (x[i,] - min(x[i,], na.rm = TRUE)) / 
-            (max(x[i,], na.rm = TRUE) - min(x[i,], na.rm = TRUE)) + 0.001 ## Standardizing to the 0-1 scale
-    x[i,] = ifelse(is.na(x[i,]), 0, x[i,]) ## Masking NA values
+preprocess <- function(inputs, targets){
+  for (i in 1:dim(inputs)[1]){
+    inputs[i,] = (inputs[i,] - min(targets[i,])) / (max(targets[i,]) - min(targets[i,])) 
+    targets[i,] = (targets[i,] - min(targets[i,])) / (max(targets[i,]) - min(targets[i,]))
+    
+    inputs[i,] = ifelse(is.na(inputs[i,]), -1, inputs[i,])
   }
-  return(x)
+  return(list(inputs, targets))
 }
 
 
@@ -95,31 +98,53 @@ preprocess <- function(x){
 #' structure of the original time series. With each new series, a specified gap structure is 
 #' imposed and returned are two data matrices: one with missing gaps (inputs) and one that is
 #' complete (targets). Completes the third and fourth steps of the designed algorithm.
-#' @param x {list}; List object containing a complete time series 
+#' @param x0 {list}; List object containing a the original incomplete time series 
+#' @param xI {list}; List object containing a complete time series (i.e., up-to-date imputation)
+#' @param x {list}; List object containing a complete time series (i.e., trend + period estimation)
 #' @param n_series {integer}; Number of new time series to construct
-#' @param var {float}; Variance for perturbations
 #' @param p {flaot}; Proportion of missing data to be applied to the simulated series
 #' @param g {integer}; Gap width of missing data to be applied to the simulated series
 #' @param K {integer}; Number of output series with a unique gap structure for each simulated series
+#' @param random {boolean}; Indicator of whether or not the gap placement is randomized
 #' 
-simulator <- function(x, n_series, var, p, g, K){
+simulator <- function(x0, xI, x, n_series, p, g, K, random = TRUE){
+  if (random == FALSE){K = 1}
   N = length(x); M = n_series * K ## Defining useful parameters
   inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
+  w = xI - x ## Computing the residual noise
+  w = fft(w, inverse = FALSE) ## Converting noise to frequency domain
   
-  for (i in 1:n_series){
-    x_p = x + rnorm(1, 0, var) + rnorm(N, 0, var) ## Creating small perturbation
-    x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
-    
-    for (k in 1:K){
-      structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
-      inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+  if (random == TRUE){
+    for (i in 1:n_series){
+      w_p = w * complex(modulus = 1, argument = runif(N, 0, 2*pi)) ## Creating small perturbation
+      w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+      x_p = x + w_t ## Adding perturbed noise back to trend and periodic
+      x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
+      
+      for (k in 1:K){
+        structure = paste0('x_g[[1]]$p', p, '$g', g, '[[k]]')
+        inputs_temp = c(inputs_temp, eval(parse(text = structure))) ## Appending inputs
+        targets_temp = c(targets_temp, x_p) ## Appending targets
+      }
+    }
+  }
+  
+  else if (random == FALSE){
+    g_index = which(is.na(x0)) ## Defining useful parameters
+    for (i in 1:n_series){
+      w_p = w * complex(modulus = 1, argument = runif(100, 0, 2*pi)) ## Creating small perturbation
+      w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+      x_p = x + w_t ## Adding perturbed noise back to trend and periodic
+      x_g = x_p; x_g[g_index] = NA ## Imposing non-randomized gap structure
+      inputs_temp = c(inputs_temp, x_g) ## Appending inputs
       targets_temp = c(targets_temp, x_p) ## Appending targets
     }
   }
+  
   inputs = array(matrix(inputs_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting inputs
   targets = array(matrix(targets_temp, nrow = M, byrow = TRUE), dim = c(M, N)) ## Properly formatting targets
-  inputs = preprocess(inputs) ## Preprocessing inputs
-  targets = preprocess(targets) ## Preprocessing targets
+  preprocessed = preprocess(inputs, targets) ## Preprocessing
+  inputs = preprocessed[[1]]; targets = preprocessed[[2]]
   return(list(inputs, targets))
 }
 
@@ -134,16 +159,19 @@ simulator <- function(x, n_series, var, p, g, K){
 #' 
 impute <- function(x0, inputs, targets){
   N = dim(inputs)[2] ## Defining useful parameters
-  x0 = as.array(matrix(ifelse(is.na(x0), 0, x0), nrow = 1, byrow = TRUE)) ## Formatting original series
+  x0 = as.array(matrix(ifelse(is.na(x0), -1, x0), nrow = 1, byrow = TRUE)) ## Formatting original series
+  
+  inputs = tf$constant(inputs) ## Creating input tensors
+  targets = tf$constant(targets) ## Creating target tensors
+  x0 = tf$constant(x0) ## Creating prediction tensor
   
   autoencoder = keras_model_sequential(name = 'Autoencoder') %>% ## Constructing the model
-    layer_masking(mask_value = 0, input_shape = c(N)) %>%
+    layer_masking(mask_value = -1, input_shape = c(N)) %>%
     layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
     layer_dense(units = N, activation = 'sigmoid', name = 'decoder') 
   
   autoencoder %>% compile( ## Compiling the model
-    optimizer = 'adam',
-    loss = 'binary_crossentropy')
+    optimizer = 'adam', loss = 'binary_crossentropy')
   
   autoencoder %>% fit(inputs, targets, epochs = 25, batch_size = 32, ## Fitting the model to the training data
                       shuffle = TRUE, validation_split = 0.2, verbose = 0)
@@ -511,29 +539,76 @@ findPowers <- function(N,f0,Nyq,prec) {
 #' @param p {flaot}; Proportion of missing data to be applied to the simulated series
 #' @param g {integer}; Gap width of missing data to be applied to the simulated series
 #' @param K {integer}; Number of output series with a unique gap structure for each simulated series
-#' @param var {float}; Variance for perturbations
 #'
-main <- function(x0, max_iter, n_series, p, g, K, var){
+main <- function(x0, max_iter, n_series, p, g, K){
   
-  results = matrix(NA, ncol = length(x0), nrow = max_iter) ## Defining matrix to store results
-  xI = initialize(x0) ## Step 1
+  # Defining matrix to store results
+  results = matrix(NA, ncol = length(x0), nrow = max_iter)
+  
+  ## Step 1: Linear imputation
+  xI = initialize(x0)
   
   for (i in 1:max_iter){
-    x_est = estimator(xI) ## Step 2
-    data = simulator(x_est, n_series, var, p, g, K); inputs = data[[1]]; targets = data[[2]] ## Steps 3/4
-    pred = impute(x0, inputs, targets) ## Step 5
-    xI = ifelse(is.na(x0), pred, x0); results[i,] = xI ## Step 6
-    print(paste0('Interation ', i))
+    ## Step 2: Getting an estimate for trend + period
+    x_estimate = estimator(xI)
+    
+    ## Step 3/4: Simulating time series and imposing gap structure
+    data = simulator(x0, xI, x_estimate, n_series, p, g, K, random = TRUE)
+    inputs = data[[1]]; targets = data[[2]]
+    
+    ## Step 5: Performing the imputation
+    pred = impute(x0, inputs, targets)
+    
+    ## Step 6: Extracting the predicted values and updating imputed series
+    xI = ifelse(is.na(x0), pred, x0); results[i,] = xI
+    print(paste0('Iteration ', i))
   }
   return(colMeans(results))
 }
 
 
-set.seed(22)
-x = simXt(N = 100, numTrend = 0, numFreq = 2)$Xt
+
+## -----------------------
+## Continuation of demo:
+
+
+## Generating a time series
+set.seed(42)
+x = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
+x = (x - min(x)) / (max(x) - min(x))
 plot(x, type = 'l', lwd = 1.5); grid()
 
+## Imposing a gap structure (p = 10% and g = 1)
 x_0 = simulateGaps(list(x), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
+
+## Calling the Neural Network Imputer
+x_I = main(x_0, max_iter = 10, n_series = 100, p = 0.1, g = 1, K = 5)
+
+## Plotting the imputation vs. ground truth
+plot(x_I, type = 'l', col = 'red', main = 'Imputation Results', xlab = 'Time', ylab = 'X')
+lines(which(is.na(x_0)), x_I[which(is.na(x_0))], type = 'p', col = 'black', 
+      pch = 21, bg = 'red', cex = 0.7)
+lines(x, type = 'l', lwd = 2); grid()
+legend('topleft', legend = c('Original TS', 'Imputed Value'), 
+       lty = c(1, NA), pch = c(NA, 16), cex = 1, lwd = c(2, 2),
+       col = c('black', 'red'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 x_i = initialize(x_0)
 x_est = estimator(x_i)
 lines(x_est, type = 'l', col = 'red', lwd = 0.5)
