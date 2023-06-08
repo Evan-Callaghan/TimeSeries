@@ -327,7 +327,6 @@ estimateTt <- function(x, epsilon, dT, nw, k, sigClip, progress=FALSE, freqIn=NU
   }
 }
 
-
 ## Defining helper functions
 dpssap <- function(V, maxdeg) {
   
@@ -399,7 +398,6 @@ dpssap <- function(V, maxdeg) {
   Hn <- colSums(R^2)
   return(list(U,R,Hn))
 }
-
 
 removePeriod <- function(xd, f0, nw, k, deltaT, warn=FALSE, prec=1e-10, sigClip) {
   
@@ -486,7 +484,6 @@ removePeriod <- function(xd, f0, nw, k, deltaT, warn=FALSE, prec=1e-10, sigClip)
   #            "Phse: ", Arg(spec$mtm$cmv[f0.idx]), "\n", sep=""))
   return(inv)
 }
-
 
 findPowers <- function(N,f0,Nyq,prec) {
   nFFT <- 1e30
@@ -582,16 +579,83 @@ plot(x, type = 'l', lwd = 1.5); grid()
 x_0 = simulateGaps(list(x), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
 
 ## Calling the Neural Network Imputer
-x_I = main(x_0, max_iter = 10, n_series = 100, p = 0.1, g = 1, K = 5)
+x_I = main(x_0, max_iter = 5, n_series = 100, p = 0.1, g = 1, K = 5)
 
 ## Plotting the imputation vs. ground truth
 plot(x_I, type = 'l', col = 'red', main = 'Imputation Results', xlab = 'Time', ylab = 'X')
 lines(which(is.na(x_0)), x_I[which(is.na(x_0))], type = 'p', col = 'black', 
       pch = 21, bg = 'red', cex = 0.7)
 lines(x, type = 'l', lwd = 2); grid()
-legend('topleft', legend = c('Original TS', 'Imputed Value'), 
-       lty = c(1, NA), pch = c(NA, 16), cex = 1, lwd = c(2, 2),
-       col = c('black', 'red'))
+legend('topleft', legend = c('True TS', 'Imputed Value'), lty = c(1, NA), pch = c(NA, 16), 
+       cex = 1, lwd = 2, col = c('black', 'red'))
+
+## Printing performance metrics
+print(paste0('RMSE: ', round(eval_performance(x = x, X = x_I, gappyx = x_0)$RMSE, 4)))
+print(paste0('MAE: ', round(eval_performance(x = x, X = x_I, gappyx = x_0)$MAE, 4)))
+
+
+
+## Next Steps:
+## - Creating a framework for testing NN Imputer vs. other methods
+
+
+
+
+
+
+
+ps = c(0.1, 0.2, 0.3)
+gs = c(5, 10, 20)
+N = 500
+i = 1
+results = matrix(NA, ncol = 7, nrow = length(ps) * length(gs))
+
+for (p in ps){
+  for (g in gs){
+    
+    hwi_list = c(); nn_list = c(); li_list = c();
+    kaf_list = c(); sma_list = c(); rmea_list = c(); 
+    neural_list = c();
+    
+    for (j in 1:5){
+      
+      x = simXt(N = 500, numTrend = 0)$Xt
+      x = (x - min(x)) / (max(x) - min(x))
+      
+      x_gap = simulateGaps(list(x), p = p, g = g, K = 1)
+      x_gap2 = eval(parse(text = paste0('x_gap[[1]]$p', p, '$g', g, '[[1]]')))
+      
+      interp = parInterpolate(x_gap, methods = c('HWI', 'NN', 'LI', 'KAF', 'SMA', 'RMEA'))
+
+      x_hwi = eval(parse(text = paste0('interp[[1]]$HWI$p', p, '$g', g, '[[1]]')))
+      x_nn = eval(parse(text = paste0('interp[[1]]$NN$p', p, '$g', g, '[[1]]')))
+      x_li = eval(parse(text = paste0('interp[[1]]$LI$p', p, '$g', g, '[[1]]')))
+      x_kaf = eval(parse(text = paste0('interp[[1]]$KAF$p', p, '$g', g, '[[1]]')))
+      x_sma = eval(parse(text = paste0('interp[[1]]$SMA$p', p, '$g', g, '[[1]]')))
+      x_rmea = eval(parse(text = paste0('interp[[1]]$RMEA$p', p, '$g', g, '[[1]]')))
+      x_neural = main(x_gap2, max_iter = 10, n_series = 20, p = p, g = g, K = 10)
+      
+      hwi_list = append(hwi_list, eval_performance(x = x, X = x_hwi, gappyx = x_gap2)$RMSE)
+      nn_list = append(nn_list, eval_performance(x = x, X = x_nn, gappyx = x_gap2)$RMSE)
+      li_list = append(li_list, eval_performance(x = x, X = x_li, gappyx = x_gap2)$RMSE)
+      kaf_list = append(kaf_list, eval_performance(x = x, X = x_kaf, gappyx = x_gap2)$RMSE)
+      sma_list = append(sma_list, eval_performance(x = x, X = x_sma, gappyx = x_gap2)$RMSE)
+      rmea_list = append(rmea_list, eval_performance(x = x, X = x_rmea, gappyx = x_gap2)$RMSE)
+      neural_list = append(neural_list, eval_performance(x = x, X = x_neural, gappyx = x_gap2)$RMSE)
+    }
+    results[i, 1] = mean(hwi_list)
+    results[i, 2] = mean(nn_list)
+    results[i, 3] = mean(li_list)
+    results[i, 4] = mean(kaf_list)
+    results[i, 5] = mean(sma_list)
+    results[i, 6] = mean(rmea_list)
+    results[i, 7] = mean(neural_list)
+    
+    i = i + 1
+  }
+}
+
+results
 
 
 
@@ -603,18 +667,6 @@ legend('topleft', legend = c('Original TS', 'Imputed Value'),
 
 
 
-
-
-
-
-
-
-x_i = initialize(x_0)
-x_est = estimator(x_i)
-lines(x_est, type = 'l', col = 'red', lwd = 0.5)
-
-plot(x-x_est, type = 'l', lwd = 1.5); grid()
-mean(x-x_est)
 
 
 ## Comparing performance across methods:
@@ -639,13 +691,3 @@ eval_performance(x = x, X = x_nn, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
 eval_performance(x = x, X = x_locf, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
 eval_performance(x = x, X = x_lwma, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
 eval_performance(x = x, X = x_neural, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
-
-
-
-
-
-
-
-
-
-
