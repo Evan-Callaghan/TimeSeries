@@ -23,25 +23,24 @@ library(interpTools)
 
 #' estimator
 #' 
-#' Main function for the "estimate" file. The "case" parameter determines which method should 
+#' Main function for the "estimate" file. The "method" parameter determines which method should 
 #' be returned:
 #' Case 1: Returning the trend + periodic component(s)
 #' Case 2: Returning the trend component
 #' Case 3: Returning the periodic component(s)
 #' @param xV {list}; List containing the current version of imputed series ("x version")
-#' @param case {string}; Case in c('Xt', 'Mt', 'Tt')
+#' @param method {string}; Case in c('Xt', 'Mt', 'Tt')
 #' 
-estimator <- function(xV, case = 'Xt'){
+estimator <- function(xV, method = 'Xt'){
   Mt = estimateMt(x = xV, N = length(xV), nw = 5, k = 8, pMax = 2) ## Estimating trend component
   Tt = estimateTt(x = xV - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999) ## Estimating periodic components
-  Xt = Mt
+  Xt = Mt ## Combining trend and periodic
   for (i in 1:dim(Tt)[2]){
     Xt = Xt + Tt[,i]
   }
-  
-  if (case == 'Xt'){return(Xt)}
-  else if (case = 'Mt'){return(Mt)}
-  else if (case = 'Tt'){return(Tt)}
+  if (method == 'Xt'){return(Xt)}
+  else if (method == 'Mt'){return(Mt)}
+  else if (method == 'Tt'){return(Tt)}
 }
 
 estimateMt <- function(x, N, nw, k, pMax) {

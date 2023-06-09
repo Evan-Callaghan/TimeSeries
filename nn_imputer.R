@@ -60,15 +60,18 @@ initialize <- function(x0){
 #' Function to estimate the trend and periodic components of a given time series. Completes the second 
 #' step of the designed algorithm. Returns the estimated trend + periodic series.
 #' @param x {list}; List object containing a complete time series
+#' @param case {string}; Case in c('Xt', 'Mt', 'Tt')
 #' 
-estimator <- function(x){
-  Mt = estimateMt(x = x, N = length(x), nw = 5, k = 8, pMax = 2) ## Estimating trend component
-  Tt = estimateTt(x = x - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999) ## Estimating periodic components
-  Xt = Mt
+estimator <- function(xV, case = 'Xt'){
+  Mt = estimateMt(x = xV, N = length(xV), nw = 5, k = 8, pMax = 2) ## Estimating trend component
+  Tt = estimateTt(x = xV - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999) ## Estimating periodic components
+  Xt = Mt ## Combining trend and periodic
   for (i in 1:dim(Tt)[2]){
     Xt = Xt + Tt[,i]
   }
-  return(Xt)
+  if (case == 'Xt'){return(Xt)}
+  else if (case == 'Mt'){return(Mt)}
+  else if (case == 'Tt'){return(Tt)}
 }
 
 
@@ -116,7 +119,7 @@ simulator <- function(x0, xI, x, n_series, p, g, K, random = TRUE){
   
   if (random == TRUE){
     for (i in 1:n_series){
-      w_p = w * complex(modulus = 1, argument = runif(N, 0, 2*pi)) ## Creating small perturbation
+      w_p = w * complex(modulus = runif(N, 0.97, 1.03), argument = runif(N, -pi/6, pi/6)) ## Creating small perturbation
       w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
       x_p = x + w_t ## Adding perturbed noise back to trend and periodic
       x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
@@ -132,7 +135,7 @@ simulator <- function(x0, xI, x, n_series, p, g, K, random = TRUE){
   else if (random == FALSE){
     g_index = which(is.na(x0)) ## Defining useful parameters
     for (i in 1:n_series){
-      w_p = w * complex(modulus = 1, argument = runif(100, 0, 2*pi)) ## Creating small perturbation
+      w_p = w * complex(modulus = runif(N, 0.97, 1.03), argument = runif(N, -pi/6, pi/6)) ## Creating small perturbation
       w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
       x_p = x + w_t ## Adding perturbed noise back to trend and periodic
       x_g = x_p; x_g[g_index] = NA ## Imposing non-randomized gap structure
@@ -660,34 +663,52 @@ results
 
 
 
+## Generating a time series
+set.seed(42)
+x = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
+x = (x - min(x)) / (max(x) - min(x))
+plot(x, type = 'l', lwd = 1.5); grid()
+
+Mt = estimator(x, case = 'Mt')
+X_i = x - Mt
+X_i = X_i - mean(X_i)
+
+
+mt = estimateMt(x, N = length(x), nw = 5, k = 8, pMax = 2)
+lines(mt, type = 'l', col = 'red')
+detrend = x - mt
+plot(detrend, type = 'l')
+mean(detrend)
+plot(detrend - mean(detrend), type = 'l')
+
+no_mea = detrend - mean(detrend)
+mean(no_mea)
+
+
+
+x_freq = fft(x)
+plot(0:99, Mod(x_freq), type = 'h', lwd = 4, xlim = c(0, 50)); grid()
+
+
+x_freq_p = x_freq * complex(modulus = runif(100, 0.97, 1.03), 
+                                    argument = (runif(100, -pi/6, pi/6)))
+x_p = as.numeric(fft(x_freq_p, inverse = TRUE)) / length(x)
+
+plot(x, type = 'l', col = 'black')
+lines(x_p, type = 'l', col = 'red'); grid()
 
 
 
 
+## Imposing a gap structure (p = 10% and g = 1)
+x_0 = simulateGaps(list(x), p = 0.1, g = 1, K = 1)[[1]]$p0.1$g1[[1]]
+
+
+# 1. detrend
+# 2. Subtract mean
+# 3. Perturb
+# 4. Add mean
+# 5. Add trend
 
 
 
-
-
-## Comparing performance across methods:
-x = simXt(N = 500, numTrend = 1, a = 10)$Xt; x = (x - min(x)) / (max(x) - min(x))
-x_gappy = simulateGaps(list(x), p = 0.1, g = 1, K = 1)
-plot(x, type = 'l')
-lines(x_gappy[[1]]$p0.1$g1[[1]], type = 'l', col = 'cyan')
-grid()
-
-
-interp = parInterpolate(x_gappy, methods = c('HWI', 'NN', 'LOCF', 'LWMA'))
-x_hwi = interp[[1]]$HWI$p0.1$g1[[1]]
-x_nn = interp[[1]]$NN$p0.1$g1[[1]]
-x_locf = interp[[1]]$LOCF$p0.1$g1[[1]]
-x_lwma = interp[[1]]$LWMA$p0.1$g1[[1]]
-
-x_neural = main(x_gappy[[1]]$p0.1$g1[[1]], max_iter=10, n_series=50, p=0.1, g=1, K=10, var=0.03)
-
-
-eval_performance(x = x, X = x_hwi, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
-eval_performance(x = x, X = x_nn, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
-eval_performance(x = x, X = x_locf, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
-eval_performance(x = x, X = x_lwma, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
-eval_performance(x = x, X = x_neural, gappyx = x_gappy[[1]]$p0.1$g1[[1]])$RMSE
