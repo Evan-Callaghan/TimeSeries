@@ -88,7 +88,7 @@ simulator_demo <- function(x0, x, w, n_series, p, g, K, random = TRUE){
   
   if (random == TRUE){
     for (i in 1:n_series){
-      w_p = w * complex(modulus = 1, argument = runif(N, 0, 2*pi)) ## Creating small perturbation
+      w_p = w * complex(modulus = runif(N, 0.98, 1.02), argument = runif(N, -pi/6, -pi/6)) ## Creating small perturbation
       w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
       x_p = x + w_t ## Adding perturbed noise back to trend and periodic
       x_g = simulateGaps(list(x_p), p = p, g = g, K = K) ## Imposing gap structure
@@ -104,7 +104,7 @@ simulator_demo <- function(x0, x, w, n_series, p, g, K, random = TRUE){
   else if (random == FALSE){
     g_index = which(is.na(x0)) ## Defining useful parameters
     for (i in 1:n_series){
-      w_p = w * complex(modulus = 1, argument = runif(100, 0, 2*pi)) ## Creating small perturbation
+      w_p = w * complex(modulus = runif(N, 0.98, 1.02), argument = runif(N, -pi/6, -pi/6)) ## Creating small perturbation
       w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
       x_p = x + w_t ## Adding perturbed noise back to trend and periodic
       x_g = x_p; x_g[g_index] = NA ## Imposing non-randomized gap structure
@@ -719,7 +719,7 @@ plot(0:99, Mod(Wt_freq) / length(Wt), type='h', lwd = 4, xlab = 'Frequency', yla
 
 ```{r noise_processc}
 ## Generating new vector and multiplying the two complex vectors 
-Wt_freq_p = Wt_freq * complex(modulus = 1, argument = runif(100, 0, 2*pi))
+Wt_freq_p = Wt_freq * complex(modulus = runif(100, 0.98, 1.02), argument = runif(100, -pi/6, -pi/6))
 
 ## Converting perturbation back into time domain
 Wt_p = fft(Wt_freq_p, inverse = TRUE) / length(Wt)
