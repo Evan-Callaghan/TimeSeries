@@ -122,3 +122,18 @@ plot(detrend - mean(detrend), type = 'l')
 
 no_mea = detrend - mean(detrend)
 mean(no_mea)
+
+
+
+
+
+
+data.frame(p = c(0.1, 0.2, 0.3), g = c(5, 10, 20))
+
+
+
+
+
+
+
+
