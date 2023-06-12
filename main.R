@@ -113,22 +113,60 @@ lines(data3[[2]][2,], type = 'l', col = 'red')
 
 
 
-mt = estimateMt(x, N = length(x), nw = 5, k = 8, pMax = 2)
-lines(mt, type = 'l', col = 'red')
-detrend = x - mt
-plot(detrend, type = 'l')
-mean(detrend)
-plot(detrend - mean(detrend), type = 'l')
-
-no_mea = detrend - mean(detrend)
-mean(no_mea)
 
 
 
+library(latex2exp)
 
+set.seed(42)
+x = simXt(N = 100, mu = 0, numTrend = 1, numFreq = 2)$Xt
+x = (x - min(x)) / (max(x) - min(x))
+x0 = simulateGaps(list(x), p = 0.1, g = 1, K = 1)
+data = simulator(x0, x, n_series = 10, p = 0.1, g = 1, K = 1, random = TRUE, method = 'noise')
+data2 = simulator(x0, x, n_series = 10, p = 0.1, g = 1, K = 1, random = TRUE, method = 'all')
+data3 = simulator(x0, x, n_series = 10, p = 0.1, g = 1, K = 1, random = TRUE, method = 'separate')
 
+plot(data[[2]][1,], type = 'l', col = rgb(1, 0, 0, 0.3), xlab = 'Time', ylab = 'Xt')
+lines(data[[2]][2,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][3,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][4,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][5,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][6,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][7,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][8,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][9,], type = 'l', col = rgb(1, 0, 0, 0.3))
+lines(data[[2]][10,], type = 'l', col = rgb(1, 0, 0, 0.3))
 
-data.frame(p = c(0.1, 0.2, 0.3), g = c(5, 10, 20))
+lines(data2[[2]][1,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][2,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][3,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][4,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][5,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][6,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][7,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][8,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][9,], type = 'l', col = rgb(0, 1, 0, 0.3))
+lines(data2[[2]][10,], type = 'l', col = rgb(0, 1, 0, 0.3))
+
+lines(data3[[2]][1,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][2,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][3,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][4,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][5,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][6,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][7,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][8,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][9,], type = 'l', col = rgb(0, 0, 1, 0.3))
+lines(data3[[2]][10,], type = 'l', col = rgb(0, 0, 1, 0.3))
+
+title = 'Data Simulation Visualization'
+subtitle = TeX('$Mod = runif(0.95, 1.05), Arg = runif(\\frac{-pi}{6}, \\frac{pi}{6})$')
+mtext(line = 2.2, title, cex = 1.25)
+mtext(line = 0.4, subtitle, cex = 0.75)
+lines(x, lwd = 2, col = 'black');grid()
+legend('topleft', c('Original', 'Noise', 'All', 'Separate'), lty = 1, lwd = 2, cex = 0.8,
+       col = c('black', 'red', 'green', 'blue'))
+
 
 
 
