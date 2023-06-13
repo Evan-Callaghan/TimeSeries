@@ -48,9 +48,9 @@ imputer <- function(x0, inputs, targets){
   
   autoencoder %>% compile( ## Compiling the model
     optimizer = 'adam', loss = 'binary_crossentropy')
-  
+
   autoencoder %>% fit(inputs, targets, epochs = EPOCHS, ## Fitting the model to the training data
-                      batch_size = BATCH_SIZE, shuffle = TRUE, validation_split = 0.2, verbose = 0)
+                      batch_size = BATCH_SIZE, shuffle = TRUE, validation_split = 0.2, verbose = 1)
   
   preds = autoencoder %>% predict(x0, verbose = 0) ## Predicting on the original series
   return(preds)
