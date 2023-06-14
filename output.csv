@@ -1,0 +1,45 @@
+[1] "N: 500 P: 0.05 G: 5 Method: KAF Iteration: 1"
+[1] "N: 500 P: 0.05 G: 5 Method: KAF Iteration: 2"
+[1] "N: 500 P: 0.05 G: 5 Method: KAF Iteration: 3"
+[1] "N: 500 P: 0.05 G: 5 Method: KAF Iteration: 4"
+[1] "N: 500 P: 0.05 G: 5 Method: KAF Iteration: 5"
+[1] "N: 500 P: 0.05 G: 5 Method: HWI Iteration: 3"
+Iteration 0:  N/A  ([1] "N: 500 P: 0.05 G: 5 Method: HWI Iteration: 4"
+Iteration 0:  N/A  ([1] "N: 500 P: 0.05 G: 5 Method: HWI Iteration: 1"
+Iteration 0:  N/A  ([1] "N: 500 P: 0.05 G: 5 Method: HWI Iteration: 2"
+Iteration 0:  N/A  ([1] "N: 500 P: 0.05 G: 5 Method: HWI Iteration: 5"
+Iteration 0:  N/A  (..) 
+Iteration 1: ....) 
+Iteration 1: 0.024363
+Iteration 2: .) 
+Iteration 1: ) 
+Iteration 1: 0.001900
+Iteration 3: 0.021228
+Iteration 2: .0.032563
+Iteration 2: 0.000162
+[1] "N: 500 P: 0.05 G: 5 Method: EWMA Iteration: 4"
+[1] "N: 500 P: 0.05 G: 5 Method: LI Iteration: 4"
+[1] "N: 500 P: 0.05 G: 5 Method: NNI Iteration: 4"
+.0.025753
+Iteration 2: ) 
+Iteration 1: 0.002520
+Iteration 3: 0.005063
+Iteration 3: 0.000312
+[1] "N: 500 P: 0.05 G: 5 Method: EWMA Iteration: 3"
+0.027666
+Iteration 2: [1] "N: 500 P: 0.05 G: 5 Method: LI Iteration: 3"
+[1] "N: 500 P: 0.05 G: 5 Method: NNI Iteration: 3"
+0.000872
+[1] "N: 500 P: 0.05 G: 5 Method: EWMA Iteration: 5"
+[1] "N: 500 P: 0.05 G: 5 Method: LI Iteration: 5"
+[1] "N: 500 P: 0.05 G: 5 Method: NNI Iteration: 5"
+0.003288
+Iteration 3: 0.004059
+Iteration 3: 0.000459
+[1] "N: 500 P: 0.05 G: 5 Method: EWMA Iteration: 2"
+[1] "N: 500 P: 0.05 G: 5 Method: LI Iteration: 2"
+[1] "N: 500 P: 0.05 G: 5 Method: NNI Iteration: 2"
+0.000663
+[1] "N: 500 P: 0.05 G: 5 Method: EWMA Iteration: 1"
+[1] "N: 500 P: 0.05 G: 5 Method: LI Iteration: 1"
+[1] "N: 500 P: 0.05 G: 5 Method: NNI Iteration: 1"
