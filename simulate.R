@@ -54,7 +54,7 @@ simulator <- function(x0, xV, n_series, p, g, K, random = TRUE, method = 'noise'
   
   ## Defining helpful global variables
   Mod_a <<- 0.95; Mod_b <<- 1.05
-  Arg_a <<- -pi/6; Arg_b <<- pi/6
+  Arg_a <<- -pi/4; Arg_b <<- pi/4
   
   ## Case 1:
   if (method == 'noise'){

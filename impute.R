@@ -33,7 +33,7 @@ imputer <- function(x0, inputs, targets){
   
   ## Defining useful parameters
   N = dim(inputs)[2]
-  EPOCHS = 10; BATCH_SIZE = 32
+  EPOCHS = 12; BATCH_SIZE = 32
   
   x0 = as.array(matrix(ifelse(is.na(x0), -1, x0), nrow = 1, byrow = TRUE)) ## Formatting original series
   
@@ -50,7 +50,7 @@ imputer <- function(x0, inputs, targets){
     optimizer = 'adam', loss = 'binary_crossentropy')
 
   autoencoder %>% fit(inputs, targets, epochs = EPOCHS, ## Fitting the model to the training data
-                      batch_size = BATCH_SIZE, shuffle = TRUE, validation_split = 0.2, verbose = 1)
+                      batch_size = BATCH_SIZE, shuffle = TRUE, validation_split = 0.2, verbose = 0)
   
   preds = autoencoder %>% predict(x0, verbose = 0) ## Predicting on the original series
   return(preds)
