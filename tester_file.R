@@ -117,4 +117,7 @@ grouped_results = results_df %>% dplyr::group_by(Method, N, P, G) %>%
 View(grouped_results)
 
 
+results_df$MAE[1:10]
+results_df$MAPE[1:10]
+
 
