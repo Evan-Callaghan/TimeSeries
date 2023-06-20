@@ -103,6 +103,7 @@ colnames(results_df) = c('N', 'P', 'G', 'K', 'Method', 'r', 'r_2', 'AD', 'MBE', 
                          'NRMSD', 'RMSS', 'MdAPE')
 results_df[,c(-5)] = lapply(results_df[,c(-5)], as.numeric)
 
+
 ## Saving results file
 write.csv(results_df, 'sim_results.csv', row.names = FALSE)
 
