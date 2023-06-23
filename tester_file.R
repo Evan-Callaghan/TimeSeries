@@ -41,7 +41,6 @@ for (n in N){
         
         ## House-keeping
         print(paste0('N: ', n, '   P: ', p, '   G: ', g, '   Iteration: ', iter))
-        set.seed(sample(x = 1:1e6, size = 1))
         
         ## Simulating the time series
         x = interpTools::simXt(N = n, numTrend = 0)$Xt
