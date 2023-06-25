@@ -25,6 +25,8 @@ source('main.R')
 
 methods = c('HWI', 'EWMA', 'LI'); networks = 48
 
+
+
 N = c(1000)
 P = c(0.1, 0.2, 0.3)
 G = c(10, 20, 30)
