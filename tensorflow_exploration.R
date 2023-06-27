@@ -252,6 +252,8 @@ for (i in 1:3){
   grid()
 }
 
+array(data_gappy[1,], dim = c(1, length(data_gappy[1,])))
+
 
 ## Constructing and compiling the model
 autoencoder <- keras_model_sequential(name = 'Autoencoder') %>%
@@ -308,6 +310,38 @@ padded_inputs <- pad_sequences(raw_inputs, padding = "post"); print(padded_input
 
 embedding <- layer_embedding(input_dim = 5000, output_dim = 16, mask_zero = TRUE)
 masked_output <- embedding(padded_inputs);print(masked_output$'_keras_mask')
+
+
+
+
+
+
+
+
+## LSTM Learning:
+
+library(tensorflow)
+library(keras)
+library(interpTools)
+
+source('main.R')
+source('ititialize.R')
+source('estimate.R')
+source('simulate.R')
+
+
+
+
+autoencoder_lstm = keras_model_sequential(name = 'Autoencoder LSTM') %>%
+  layer_masking(mask_value = -1, input_shape = c(N, 1), name = 'mask') %>%
+  layer_lstm(units = 64, name = 'LSTM') %>%
+  layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
+  layer_dense(units = N, activation = 'sigmoid', name = 'decoder')
+
+summary(autoencoder_lstm)
+
+
+
 
 
 
