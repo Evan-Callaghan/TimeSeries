@@ -1,0 +1,145 @@
+---
+title: "Simulation Results"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r reading_data, include = FALSE}
+library(dplyr)
+library(ggplot2)
+
+sim1 = read.csv('Simulation_Results/sim_1.csv')
+sim2 = read.csv('Simulation_Results/sim_2.csv')
+
+colors = c("#F7C65B","#FAAF08","#FA812F","#FA4032","#F92111")
+col = colorRampPalette(colors = colors)(100)
+```
+
+#### First Set of Simulations:
+- All time series of length $N = 1000$.
+- Five iterations with each combination of $(P, G)$.
+- Comparison of average RMSE, MAE, and MAPE across each Method, $P$, and $G$ combination.
+- Used several different parameter combinations for the NNI method. For results, extracted the highest performing NNI model on average within each $(P, G)$ combination.
+- Issues with plotting in 'interpTools' so I wrote my own aggregations and plotting formats.
+
+```{r first_sim, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+
+grouped_NNI = sim1 %>% dplyr::group_by(Method, P, G, max_iter, K, n_series, random, method) %>%
+                       dplyr::summarise(mae = mean(MAE), 
+                                        rmse = mean(RMSE), 
+                                        mape = mean(MAPE))
+
+NNI_mae = grouped_NNI %>% dplyr::arrange(mae) %>% 
+                          dplyr::group_by(P, G) %>% 
+                          dplyr::filter(row_number()==1)
+NNI_rmse = grouped_NNI %>% dplyr::arrange(rmse) %>% 
+                          dplyr::group_by(P, G) %>% 
+                          dplyr::filter(row_number()==1)
+NNI_mape = grouped_NNI %>% dplyr::arrange(mape) %>% 
+                          dplyr::group_by(P, G) %>% 
+                          dplyr::filter(row_number()==1)
+
+imp_mae = rbind(sim2 %>% dplyr::group_by(Method, P, G) %>% dplyr::summarize(mae = mean(MAE)), 
+                NNI_mae %>% dplyr::select(Method, P, G, mae))
+imp_rmse = rbind(sim2 %>% dplyr::group_by(Method, P, G) %>% dplyr::summarize(rmse = mean(RMSE)), 
+                NNI_rmse %>% dplyr::select(Method, P, G, rmse))
+imp_mape = rbind(sim2 %>% dplyr::group_by(Method, P, G) %>% dplyr::summarize(mape = mean(MAPE)), 
+                NNI_mape %>% dplyr::select(Method, P, G, mape))
+
+desired_order = c("HWI", "NNI", "EWMA", "LI")
+imp_mae$Method = factor(as.character(imp_mae$Method), levels = desired_order)
+imp_mae <- imp_mae[order(imp_mae$Method),]
+imp_rmse$Method = factor(as.character(imp_rmse$Method), levels = desired_order)
+imp_rmse <- imp_rmse[order(imp_rmse$Method),]
+imp_mape$Method = factor(as.character(imp_mape$Method), levels = desired_order)
+imp_mape <- imp_mape[order(imp_mape$Method),]
+```
+
+
+```{r first_sim2, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+ggplot(imp_mae, aes(P, G, fill = mae)) +
+  geom_tile(color = "gray95",lwd = 0.5, linetype = 1) +
+  facet_grid(~ Method) +
+  labs(title = 'Simulation Results with N = 1000 (Avg. MAE)', 
+       x = "Missing Proportion (P)", 
+       y = "Gap Width (G)", 
+       fill = 'MAE') +
+  scale_fill_gradientn(colours = col, values = c(0,1)) + 
+  guides(fill = guide_colourbar(label = FALSE, ticks = FALSE)) +
+  geom_text(aes(label = round(mae, 3)), color = "white", size = 3) +
+  theme_minimal()
+```
+
+```{r first_sim3, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+ggplot(imp_rmse, aes(P, G, fill = rmse)) +
+  geom_tile(color = "gray95",lwd = 0.5, linetype = 1) +
+  facet_grid(~ Method) +
+  labs(title = 'Simulation Results with N = 1000 (Avg. RMSE)', 
+       x = "Missing Proportion (P)", 
+       y = "Gap Width (G)", 
+       fill = 'RMSE') +
+  scale_fill_gradientn(colours = col, values = c(0,1)) + 
+  guides(fill = guide_colourbar(label = FALSE, ticks = FALSE)) +
+  geom_text(aes(label = round(rmse, 3)), color = "white", size = 3) +
+  theme_minimal()
+```
+
+```{r first_sim4, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+ggplot(imp_mape, aes(P, G, fill = mape)) +
+  geom_tile(color = "gray95",lwd = 0.5, linetype = 1) +
+  facet_grid(~ Method) +
+  labs(title = 'Simulation Results with N = 1000 (Avg. MAPE)', 
+       x = "Missing Proportion (P)", 
+       y = "Gap Width (G)", 
+       fill = 'MAPE') +
+  scale_fill_gradientn(colours = col, values = c(0,1)) + 
+  guides(fill = guide_colourbar(label = FALSE, ticks = FALSE)) +
+  geom_text(aes(label = round(mape, 1)), color = "white", size = 3) +
+  theme_minimal()
+```
+
+\newpage
+
+
+#### Second Set of Simulations:
+- All time series of length $N = 1000$.
+- 10 iterations with each combination of $(P, G)$ and more options for $P$ and $G$.
+- Comparison of average RMSE, MAE, and MAPE across each Method, $P$, and $G$ combination.
+- Too many issues with the HWI error (same one as last week) so I had to omit it from this set of simulations.
+- Used a single set of parameters for the NNI based on the dominant parameters in the first set of simulations (Standouts: 'random' == FALSE, 'method' == noise, larger amount of training data).
+- Issues with plotting in 'interpTools' so I wrote my own aggregations and plotting formats.
+
+
+```{r second_sim, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+
+
+```
+
+
+```{r second_sim2, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+
+```
+
+```{r second_sim3, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+
+```
+
+```{r second_sim4, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+
+```
+
+
+
+
+#### Third Set of Simulations:
+- All time series of length $N = 1000$.
+- Instead of simulating time series with periodic components, only using the 'simWt' function from interpTools which uses 'arima.sim' to generate stationary noise. 
+- 10 iterations with each combination of $(P, G)$ and more options for $P$ and $G$.
+- Comparison of average RMSE, MAE, and MAPE across each Method, $P$, and $G$ combination.
+- Too many issues with the HWI error (same one as last week) so I had to omit it from this set of simulations.
+- Used a single set of parameters for the NNI based on the dominant parameters in the first set of simulations (Standouts: 'random' == FALSE, 'method' == noise, larger amount of training data).
+- Issues with plotting in 'interpTools' so I wrote my own aggregations and plotting formats.
+
