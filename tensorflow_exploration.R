@@ -332,6 +332,8 @@ source('simulate.R')
 
 
 
+
+
 autoencoder_lstm = keras_model_sequential(name = 'Autoencoder LSTM') %>%
   layer_masking(mask_value = -1, input_shape = c(N, 1), name = 'mask') %>%
   layer_lstm(units = 64, name = 'LSTM') %>%
