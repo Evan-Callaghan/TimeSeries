@@ -36,25 +36,20 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   ## Saving length of experiment
   M = length(P) * length(G) * K * length(METHODS)
   
-  for (p in P){
-    for (g in G){
-      
-      ## Impose
-      x0 = interpTools::simulateGaps(list(X), p, g, K)
-      
-      ## Impute
-      xI = my_parInterpolate(x0, METHODS)
-      
-      ## Evaluate
-      performance = my_performance(X, xI, x0)
-      
-      ## Aggregate
-      aggregation = interpTools::aggregate_pf(performance)
-      
-      ## Return
-      return(aggregation)
-    }
-  }
+  ## Impose
+  x0 = interpTools::simulateGaps(list(X), p, g, K)
+  
+  ## Impute
+  xI = my_parInterpolate(x0, METHODS)
+  
+  ## Evaluate
+  performance = my_performance(X, xI, x0)
+  
+  ## Aggregate
+  aggregation = interpTools::aggregate_pf(performance)
+  
+  ## Return
+  return(aggregation)
 }
 X = interpTools::simXt(N = 1000, mu = 0)$Xt
 FRAMEWORK(X, P = c(0.1), G = c(5, 10), K = 10, METHODS = c('HWI', 'LI', 'EWMA', 'NNI'))
