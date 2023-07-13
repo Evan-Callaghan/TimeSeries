@@ -47,7 +47,7 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   aggregation = interpTools::aggregate_pf(performance)
   
   ## Return
-  return(aggregation)
+  return(list(x0, xI, performance, aggregation))
 }
 
 # X = interpTools::simXt(N = 1000, mu = 0)$Xt
