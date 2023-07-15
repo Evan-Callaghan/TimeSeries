@@ -50,11 +50,11 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   return(list(x0, xI, performance, aggregation))
 }
 
-# X = interpTools::simXt(N = 1000, mu = 0)$Xt
-# results = FRAMEWORK(X, P = c(0.1), G = c(10, 25), K = 3, METHODS = c('LI', 'HWI', 'NNI'))
-# results
-# my_new_multiHeatmap(results, P = c(0.1), G = c(10, 25), crit = 'RMSE', f = 'mean', 
-#                     METHODS = c('LI', 'HWI', 'NNI'))
+X = interpTools::simXt(N = 1000, mu = 0)$Xt
+results = FRAMEWORK(X, P = c(0.1), G = c(10, 25), K = 3, METHODS = c('LI', 'HWI', 'NNI'))
+results
+my_new_multiHeatmap(results, P = c(0.1), G = c(10, 25), crit = 'RMSE', f = 'mean',
+                    METHODS = c('LI', 'HWI', 'NNI'))
 
 
 #' my_parInterpolate
