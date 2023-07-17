@@ -38,7 +38,7 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   x0 = interpTools::simulateGaps(list(X), P, G, K); print('Imposed Gaps')
   
   ## Impute
-  xI = my_parInterpolate(x0, METHODS); print('Interpolated')
+  xI = my_parInterpolate(x0, METHODS)
   
   ## Evaluate
   performance = my_performance(OriginalData = X, IntData = xI, GappyData = x0)
@@ -50,11 +50,11 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   return(list(x0, xI, performance, aggregation))
 }
 
-X = interpTools::simXt(N = 1000, mu = 0)$Xt
-results = FRAMEWORK(X, P = c(0.1), G = c(10, 25), K = 3, METHODS = c('LI', 'HWI', 'NNI'))
-results
-my_new_multiHeatmap(results, P = c(0.1), G = c(10, 25), crit = 'RMSE', f = 'mean',
-                    METHODS = c('LI', 'HWI', 'NNI'))
+# X = interpTools::simXt(N = 1000, mu = 0)$Xt
+# results = FRAMEWORK(X, P = c(0.1), G = c(10, 25), K = 3, METHODS = c('LI', 'HWI', 'NNI'))
+# results
+# my_new_multiHeatmap(results, P = c(0.1), G = c(10, 25), crit = 'RMSE', f = 'mean', 
+#                     METHODS = c('LI', 'HWI', 'NNI'))
 
 
 #' my_parInterpolate
@@ -73,7 +73,7 @@ my_parInterpolate <- function(x0, METHODS){
     METHODS = METHODS[METHODS != 'NNI']
     
     ## Calling interpTools with remaining methods
-    xI_all = interpTools::parInterpolate(x0, methods = METHODS); print('Main Interpolation')
+    xI_all = interpTools::parInterpolate(x0, methods = METHODS); print('Other Interpolation')
     
     ## Performing NNI imputation
     xI_NNI = my_parInterpolate_NNI(x0) ; print('NNI Interpolation')
@@ -119,7 +119,7 @@ my_parInterpolate_NNI <- function(x0){
   int_data = list()
   
   ## Setting up the function call
-  function_call = paste0("run_simulation(x, 10, 100, 'all', 0.05, pi/6, 1)")
+  function_call = paste0("run_simulation(x, 5, 500, 'all', 0.05, pi/6, 1)")
   
   ## Performing imputation
   int_series[[M]] = lapply(x0[[D]], function(x){
