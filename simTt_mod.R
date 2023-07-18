@@ -2,7 +2,7 @@
 
 
 
-sim_Tt_mod <- function(N = 1000, numFreq, P){
+simTt_mod <- function(N = 1000, numFreq, P){
   
   ## Defining helpful variables
   Tt_list <- list()
@@ -27,8 +27,6 @@ sim_Tt_mod <- function(N = 1000, numFreq, P){
   }
   
   text = substr(text, start = 1, stop = nchar(text) - 3)
-  
-  print(text)
   
   ## Returning final list object
   Tt_list$fn <- paste(text, collapse="")  
