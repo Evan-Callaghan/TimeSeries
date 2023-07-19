@@ -38,7 +38,7 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   x0 = interpTools::simulateGaps(list(X), P, G, K); print('Imposed Gaps')
   
   ## Impute
-  xI = my_parInterpolate(x0, METHODS)
+  xI = my_parInterpolate(x0, METHODS); print('Interpolated Gaps')
   
   ## Evaluate
   performance = my_performance(OriginalData = X, IntData = xI, GappyData = x0)
@@ -50,11 +50,6 @@ FRAMEWORK <- function(X, P, G, K, METHODS){
   return(list(x0, xI, performance, aggregation))
 }
 
-# X = interpTools::simXt(N = 1000, mu = 0)$Xt
-# results = FRAMEWORK(X, P = c(0.1), G = c(10, 25), K = 3, METHODS = c('LI', 'HWI', 'NNI'))
-# results
-# my_new_multiHeatmap(results, P = c(0.1), G = c(10, 25), crit = 'RMSE', f = 'mean', 
-#                     METHODS = c('LI', 'HWI', 'NNI'))
 
 
 #' my_parInterpolate
@@ -73,10 +68,10 @@ my_parInterpolate <- function(x0, METHODS){
     METHODS = METHODS[METHODS != 'NNI']
     
     ## Calling interpTools with remaining methods
-    xI_all = interpTools::parInterpolate(x0, methods = METHODS); print('Other Interpolation')
+    xI_all = interpTools::parInterpolate(x0, methods = METHODS)
     
     ## Performing NNI imputation
-    xI_NNI = my_parInterpolate_NNI(x0) ; print('NNI Interpolation')
+    xI_NNI = my_parInterpolate_NNI(x0)
     
     ## Joining the two results
     xI = list(c(xI_all[[1]], xI_NNI[[1]]))
@@ -192,12 +187,6 @@ my_new_multiHeatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', 
     theme(plot.title = element_text(hjust = 0.5, size = 18)) +
     theme(strip.text = element_text(face = 'bold', size = 10))
 }
-
-# plot = my_new_multiHeatmap(results, P = c(0.1, 0.15, 0.2, 0.25, 0.3), G = c(10, 25, 50), 
-#                     METHODS = c('LI', 'EWMA', 'LOCF'), f = 'mean', crit = 'MAE')
-# plot
-
-
 
 
 
