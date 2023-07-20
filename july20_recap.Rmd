@@ -7,9 +7,10 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 
 source('simTt_mod.R')
+library(interpTools)
 ```
 
-### Simulating a Modulated Signal
+## Simulating a Modulated Signal
 
 From Kian's thesis we have the following formula for signals with frequency modulation:
 
@@ -19,13 +20,13 @@ Now let $\theta(t) = 2 \pi f_mt + 2 \pi \int_0^t \phi_m (\tau) \space d\tau$. Si
 
 $$\phi(\tau) = \sum_{p=0}^{P}{a_p\tau^p}$$
 $$\theta(t) = 2 \pi f_mt + 2 \pi \int_0^t \sum_{p=0}^{P}{a_p\tau^p} \space d\tau$$
-$$\theta(t) = 2 \pi f_mt + 2 \pi \int_0^t \sum_{p=0}^{P}{\frac{a_p}{p+1}t^{p+1}}$$
+$$\theta(t) = 2 \pi f_mt + 2 \pi \sum_{p=0}^{P}{\frac{a_p}{p+1}t^{p+1}}$$
 
 Using these formulas I wrote a function to simulate a modulated signal given a length $N$, number of frequencies $m$, and the maximim degree of polynomial to consider $P$.
 
 ```{r simulate}
 ## Simulating modulated signal
-set.seed(1)
+set.seed(11)
 Tt = simTt_mod(N = 100, numFreq = 1, P = 2)
 
 ## Printing the corresponding summation
@@ -39,7 +40,162 @@ plot(0:99, Tt$value, type = 'l', lwd = 2, xlab = 'Time', ylab = 'Value',
 grid()
 ```
 
+To generate values for $\mu$, $f$, and $a$ we use a similar idea to the interpTools "simTt" function: 
+```{r explanation}
+## Defining "Fourier Frequency"
+# fourierFreq = 2*pi/N
+
+## Generating cosine coefficients
+# mu = rnorm(1, mean = 0, sd = N/200)
+
+## Generating frequencies
+# f = runif(1, fourierFreq, pi)
+
+## Generating "a" coefficients
+# a = rnorm(P, mean = 0, sd = N/200)
+```
+
+Now using the interpTools "simWt" function, we can add some weakly-stationary noise to account for $Z_t$:
+
+```{r generate_noise}
+## Simulating noise from interpTools
+set.seed(11)
+Wt = interpTools::simWt(N = 100)$value
+```
+
+```{r plot2, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+## Plotting the modulated signal
+plot(0:99, Tt$value + Wt, type = 'l', lwd = 2, xlab = 'Time', ylab = 'Value', 
+     main = 'Simulated Modulated Signal + Z_t')
+grid()
+```
+
+\newpage 
 
 
 
+## Simulation Results
 
+- Used three real-world time series
+- Used one time series tailored for the Hybrid Weiner method
+- Used one time series with a modulated signal
+- Considered missing proportion ($P$) in [10%, 20%, 30%]
+- Considered gap width ($G$) in [10, 25, 50]
+- Each method is tested with 25 unique combinations of $P$ and $G$
+- Displayed results are averaged over the 25 iterations
+- Considered log-cosh loss (LCL), MAE, and RMSE for evaluation
+- Note: Neural nets are designed to minimize RMSE in training
+
+
+```{r reading_data, message = FALSE, echo=FALSE}
+## Reading the data files:
+births = read.csv('Data/daily-total-female-births.csv')
+temp = read.csv('Data/daily-max-temperatures.csv')
+sunspots = read.csv('Data/monthly-sunspots.csv')
+
+## Selecting columns of interest
+births = births$Births
+temp = temp$Temperature
+sunspots = sunspots$Sunspots
+```
+
+### Data Set 1:
+
+```{r sim1, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+## Displaying time series plot
+plot(births, type = 'l', lwd = 2, xlab = 'Time', ylab = 'Female Births', 
+     main = 'Female Births Time Series Plot'); grid()
+```
+
+<!-- ![Births data LCL performance](images/births/births_lcl.png){width=80% height=80%} -->
+
+
+<!-- ![Births data MAE performance](images/births/births_mae.png){width=80% height=80%} -->
+
+\clearpage
+
+![Births data RMSE performance](images/births/births_rmse.png){width=90% height=90%}
+
+
+
+\clearpage
+
+### Data Set 2:
+
+```{r sim2, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+## Displaying time series plot
+plot(temp, type = 'l', lwd = 2, xlab = 'Time', ylab = 'Temperature', 
+     main = 'Melbourne Temperature Time Series Plot'); grid()
+```
+
+<!--![Temperature data LCL performance](images/sim_images/temp_lcl.png){width=80% height=80%}-->
+
+<!--![Temperature data MAE performance](images/sim_images/temp_mae.png){width=80% height=80%}-->
+
+
+![Temperature data RMSE performance](images/sim_images/temp_rmse.png){width=90% height=90%}
+
+\clearpage
+
+### Data Set 3:
+
+```{r sim3, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+## Displaying time series plot
+plot(sunspots, type = 'l', lwd = 2, xlab = 'Time', main = 'Sunspots Time Series Plot',
+     ylab = 'Sunspots'); grid()
+```
+
+<!--![Sunspots data LCL performance](images/sim_images/sunspots_lcl.png){width=80% height=80%}-->
+
+<!--![Sunspots data MAE performance](images/sim_images/sunspots_mae.png){width=80% height=80%}-->
+
+
+![Sunspots data RMSE performance](images/sim_images/sunspots_rmse.png){width=90% height=90%}
+
+\clearpage
+
+![Sunspots performance example](images/example_plot.png){width=100% height=100%}
+
+
+\clearpage
+
+### Data Set 4:
+
+```{r sim4, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+## Simulating time series
+set.seed(1)
+X = interpTools::simXt(N = 500, numTrend = 0, mu = 0, numFreq = 2)$Xt
+
+## Displaying time series plot
+plot(X, type = 'l', lwd = 2, xlab = 'Time', main = 'Time Series Plot',
+     ylab = 'Xt'); grid()
+```
+
+<!--![Simulated data LCL performance](images/sim_images/reg_lcl.png){width=80% height=80%}-->
+
+<!--![Simulated data MAE performance](images/sim_images/reg_mae.png){width=80% height=80%}-->
+
+
+![Simulated data RMSE performance](images/sim_images/reg_rmse.png){width=90% height=90%}
+
+\clearpage
+
+### Data Set 5:
+
+```{r sim5, message = FALSE, warning=FALSE, fig.align='center', fig.dim=c(8,5), echo=FALSE}
+## Simulating time series
+set.seed(1)
+X = simTt_mod(N = 500, numFreq = 8, P = 3)$value
+
+## Displaying time series plot
+plot(X, type = 'l', lwd = 2, xlab = 'Time', main = 'Time Series Plot (Modulated Signal)',
+     ylab = 'Xt'); grid()
+```
+
+
+<!--![Simulated modulated data LCL performance](images/sim_images2/mod_lcl.png){width=80% height=80%}-->
+
+<!--![Simulated modulated data MAE performance](images/sim_images2/mod_mae.png){width=80% height=80%}-->
+
+
+![Simulated modulated data RMSE performance](images/sim_images2/mod_rmse.png){width=90% height=90%}
