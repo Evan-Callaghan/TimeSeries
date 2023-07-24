@@ -182,6 +182,7 @@ estimateTt <- function(x, epsilon, dT, nw, k, sigClip, progress=FALSE, freqIn=NU
   }
 }
 
+
 dpssap <- function(V, maxdeg) {
   
   # Sanity checks
