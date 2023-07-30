@@ -147,6 +147,7 @@ dim(X_valid)
 dim(X_test)
 
 
+
 model = keras_model_sequential(name = 'Model') %>% 
   layer_lstm(64, input_shape = c(5, 1)) %>%
   layer_dense(8, activation = 'relu') %>%
