@@ -185,7 +185,6 @@ lines(preds_train, type = 'l', col = 'red')
 
 
 ## ----------------------------
-
 ## LSTM IMPUTER:
 
 options(warn = -1)
@@ -292,15 +291,20 @@ dim(Y1)
 
 N = dim(X1)[1]
 #train_size = floor(0.8 * N)
-train_size = 825
+train_index = 750
+valid_index = 900
+test_index = 990
 
-X_train = X1[1:train_size,,]; Y_train = Y1[1:train_size]
-X_valid = X1[(train_size+1):N,,]; Y_valid = Y1[(train_size+1):N]
+X_train = X1[1:train_index,,]; Y_train = Y1[1:train_index]
+X_valid = X1[(train_index+1):valid_index,,]; Y_valid = Y1[(train_index+1):valid_index]
+X_test = X1[(valid_index+1):test_index,,]; Y_test = Y1[(valid_index+1):test_index]
 
 dim(X_train)
 dim(Y_train)
 dim(X_valid)
 dim(Y_valid)
+dim(X_test)
+dim(Y_test)
 
 model = keras_model_sequential(name = 'Model') %>% 
   layer_lstm(64, stateful = TRUE, batch_input_shape = c(BATCH, WINDOW, 1)) %>%
@@ -316,7 +320,7 @@ model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001),
                   loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
 
 model %>% fit(X_train, Y_train, validation_data = list(X_valid, Y_valid), 
-              epochs = 50, batch_size = BATCH, verbose = 0, callbacks = cp)
+              epochs = 50, batch_size = BATCH, callbacks = cp)
 
 ### 
 train_preds = model %>% predict(X_train, batch_size = BATCH, verbose = 0)
@@ -326,8 +330,187 @@ lines(train_preds, type = 'l', col = 'red')
 valid_preds = model %>% predict(X_valid, batch_size = BATCH, verbose = 0)
 plot(Y_valid, type = 'l', lwd = 2); grid()
 lines(valid_preds, type = 'l', col = 'red')
+
+test_preds = model %>% predict(X_test, batch_size = BATCH, verbose = 0)
+plot(Y_test, type = 'l', lwd = 2); grid()
+lines(test_preds, type = 'l', col = 'red')
 ###
 
+
+
+
+
+
+
+
+## ----------------------------
+## LSTM IMPUTER 2.0:
+
+
+set.seed(52)
+X = interpTools::simXt(N = 1000, numTrend = 1, numFreq = 2)$Xt
+X0 = interpTools::simulateGaps(list(X), p = 0.1, g = 10, K = 1)[[1]]$p0.1$g10[[1]]
+
+plot(X, type = 'l', lty = 3); grid()
+lines(X0, type = 'l', lwd = 2)
+
+blocks = get_block(X0)
+blocks
+class(blocks)
+
+blocks = cbind(blocks, c(1, 1, 1, 1))
+blocks
+
+blocks[,2] - blocks[,1]
+
+
+
+data_generator <- function(X0, window){
+  
+  ## Getting block (missing data info)
+  BLOCK = get_block(X0)
+  
+  ## Defining helpful parameters
+  B = dim(BLOCK)[1] + 1
+  INDEX = 1
+  
+  ## Initializing arrays
+  X = c(); Y = c(); 
+  
+  for (b in 1:B){
+    
+    if (b == B){
+      M = length(X0) - window - 1
+    }
+    
+    else{
+      M = BLOCK[b,1] - window - 1
+    }
+    
+    for (i in INDEX:M){
+      
+      row = X0[i:(i+window-1)]
+      target = X0[i+window]
+      
+      if (is.na(target)){
+        print(i)
+        print(target)
+      }
+      
+      X = c(X, row)
+      Y = c(Y, target)
+    }
+    
+    if (b < B){
+      INDEX = BLOCK[b,2] + 1 
+    }
+  }
+  
+  rows = length(X) / window
+  X = array(matrix(X, nrow = rows, byrow = TRUE), dim = c(rows, window, 1))
+  Y = array(matrix(Y, nrow = rows, byrow = TRUE), dim = c(rows, 1)) 
+  
+  return(list(tf$constant(X), tf$constant(Y)))
+}
+
+BATCH = 15
+WINDOW = 5
+FORECAST = 1
+data = data_generator(X0, WINDOW)
+
+X = data[[1]]
+Y = data[[2]]
+
+dim(X)
+dim(Y)
+
+X_train = X[1:690,,]; Y_train = Y[1:690]
+X_valid = X[691:840,,]; Y_valid = Y[691:840]
+
+dim(X_train)
+dim(Y_train)
+dim(X_valid)
+dim(Y_valid)
+
+model = keras_model_sequential(name = 'Model') %>% 
+  layer_lstm(64, stateful = TRUE, batch_input_shape = c(BATCH, WINDOW, 1)) %>%
+  layer_dense(8, activation = 'relu') %>%
+  layer_dense(FORECAST, activation = 'linear')
+summary(model)
+
+cp = tf$keras$callbacks$ModelCheckpoint('Callbacks/weights.{epoch:02d}-{val_loss:.2f}.hdf5', 
+                                        save_best_only = TRUE)
+
+model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
+                  loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
+
+model %>% fit(X_train, Y_train, epochs = 50, batch_size = BATCH, 
+              validation_data = list(X_valid, Y_valid), callbacks = cp)
+
+train_preds = model %>% predict(X_train, batch_size = BATCH, verbose = 0)
+plot(Y_train, type = 'l', lwd = 2); grid()
+lines(train_preds, type = 'l', col = 'red')
+
+valid_preds = model %>% predict(X_valid, batch_size = BATCH, verbose = 0)
+plot(Y_valid, type = 'l', lwd = 2); grid()
+lines(valid_preds, type = 'l', col = 'red')
+
+
+
+
+
+N = dim(X1)[1]
+#train_size = floor(0.8 * N)
+train_index = 750
+valid_index = 900
+test_index = 990
+
+X_train = X1[1:train_index,,]; Y_train = Y1[1:train_index]
+X_valid = X1[(train_index+1):valid_index,,]; Y_valid = Y1[(train_index+1):valid_index]
+X_test = X1[(valid_index+1):test_index,,]; Y_test = Y1[(valid_index+1):test_index]
+
+dim(X_train)
+dim(Y_train)
+dim(X_valid)
+dim(Y_valid)
+dim(X_test)
+dim(Y_test)
+
+model = keras_model_sequential(name = 'Model') %>% 
+  layer_lstm(64, stateful = TRUE, batch_input_shape = c(BATCH, WINDOW, 1)) %>%
+  layer_dense(8, activation = 'relu') %>%
+  layer_dense(FORECAST, activation = 'linear')
+
+summary(model)
+
+cp = tf$keras$callbacks$ModelCheckpoint('Callbacks/weights.{epoch:02d}-{val_loss:.2f}.hdf5', 
+                                        save_best_only = TRUE)
+
+model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
+                  loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
+
+model %>% fit(X_train, Y_train, validation_data = list(X_valid, Y_valid), 
+              epochs = 50, batch_size = BATCH, callbacks = cp)
+
+
+
+
+
+
+
+df_to_x_y <- function(data, window_size = 5){
+  X = c(); Y = c(); M = (length(data) - window_size)
+  for (i in 1:M){
+    row = data[i:(i+window_size-1)]
+    label = data[i+window_size]
+    X = c(X, row)
+    Y = c(Y, label)
+  }
+  
+  X = array(matrix(X, nrow = M, byrow = TRUE), dim = c(M, window_size))
+  Y = array(matrix(Y, nrow = M, byrow = TRUE), dim = c(M, 1)) 
+  return(list(X, Y))
+}
 
 
 

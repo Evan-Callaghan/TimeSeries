@@ -42,6 +42,8 @@ simTt_mod <- function(N = 1000, numFreq, P){
 
 
 
+
+
 # 
 # 
 # simTt_mod <- function(N = 1000, mu = NULL, f = NULL){
