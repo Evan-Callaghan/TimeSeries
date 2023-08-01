@@ -229,8 +229,10 @@ get_block <- function(x){
 
 
 
-sunspots = sunspots[1:1000]
-sunspots0 = sunspots; sunspots0[475:525] = NA
+
+
+sunspots = sunspots[1:995]
+sunspots0 = sunspots; #sunspots0[475:499] = NA
 
 plot(sunspots, type = 'l', col = 'red'); grid()
 lines(sunspots0, type = 'l', lwd = 2)
@@ -238,13 +240,8 @@ lines(sunspots0, type = 'l', lwd = 2)
 blocks = get_block(sunspots0)
 blocks
 
-## Split data according to block structure
-section1 = sunspots0[1:(blocks[1,1]-1)]
-section2 = sunspots0[(blocks[1,2]+1):length(sunspots0)]
-
-
 ## Creating training sets
-df_to_x_y_new <- function(data, window_length = 5, forecast_length = 1){
+df_to_x_y_new <- function(data, window_length, forecast_length = 1){
   X = c(); Y = c()
   M = length(data) - window_length #- forecast_length
   P = window_length + forecast_length
@@ -257,44 +254,58 @@ df_to_x_y_new <- function(data, window_length = 5, forecast_length = 1){
     Y = c(Y, label)
   }
   
-  ## Backward pass:
-  data = rev(data)
-  for (i in 1:M){
-    row = data[i:(i+window_length-1)]
-    label = data[(i+window_length):(i+P)]
-    X = c(X, row)
-    Y = c(Y, label)
-  }
+  # ## Backward pass:
+  # data = rev(data)
+  # for (i in 1:M){
+  #   row = data[i:(i+window_length-1)]
+  #   label = data[(i+window_length):(i+P)]
+  #   X = c(X, row)
+  #   Y = c(Y, label)
+  # }
+  # 
+  # X = array(matrix(X, nrow = 2*M, byrow = TRUE), dim = c(2*M, window_length))
+  # Y = array(matrix(Y, nrow = 2*M, byrow = TRUE), dim = c(2*M, forecast_length)) 
   
-  X = array(matrix(X, nrow = 2*M, byrow = TRUE), dim = c(2*M, window_length))
-  Y = array(matrix(Y, nrow = 2*M, byrow = TRUE), dim = c(2*M, forecast_length)) 
+  X = array(matrix(X, nrow = M, byrow = TRUE), dim = c(M, window_length, 1))
+  Y = array(matrix(Y, nrow = M, byrow = TRUE), dim = c(M, forecast_length)) 
   return(list(X, Y))
 }
 
-
 ## Defining window size and forecast length
-WINDOW_LENGTH = 10
-FORECAST_LENGTH = 1
-
-input_set1 = df_to_x_y_new(section1, WINDOW_LENGTH, FORECAST_LENGTH) 
-X1 = input_set1[[1]]
-Y1 = input_set1[[2]]
-
-input_set2 = df_to_x_y_new(section2, WINDOW_LENGTH, FORECAST_LENGTH) 
-X2 = input_set2[[1]]
-Y2 = input_set2[[2]]
+WINDOW = 5
+FORECAST = 1
+BATCH = 15
 
 
-X_train = tf$constant(X); Y_train = tf$constant(Y)
+
+
+## Split data according to block structure
+#section1 = sunspots0[1:(blocks[1,1]-1)]
+section1 = sunspots0
+
+input_set1 = df_to_x_y_new(section1, WINDOW, FORECAST) 
+X1 = tf$constant(input_set1[[1]])
+Y1 = tf$constant(input_set1[[2]])
+
+dim(X1)
+dim(Y1)
+
+N = dim(X1)[1]
+#train_size = floor(0.8 * N)
+train_size = 825
+
+X_train = X1[1:train_size,,]; Y_train = Y1[1:train_size]
+X_valid = X1[(train_size+1):N,,]; Y_valid = Y1[(train_size+1):N]
 
 dim(X_train)
 dim(Y_train)
-
+dim(X_valid)
+dim(Y_valid)
 
 model = keras_model_sequential(name = 'Model') %>% 
-  layer_lstm(64, input_shape = c(WINDOW_LENGTH, 1)) %>%
-  layer_dense(16, activation = 'relu') %>%
-  layer_dense(FORECAST_LENGTH, activation = 'linear')
+  layer_lstm(64, stateful = TRUE, batch_input_shape = c(BATCH, WINDOW, 1)) %>%
+  layer_dense(8, activation = 'relu') %>%
+  layer_dense(FORECAST, activation = 'linear')
 
 summary(model)
 
@@ -302,26 +313,38 @@ cp = tf$keras$callbacks$ModelCheckpoint('Callbacks/weights.{epoch:02d}-{val_loss
                                         save_best_only = TRUE)
 
 model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
-                  loss = 'MeanSquaredError')
+                  loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
 
-# model %>% fit(X_train, Y_train, validation_data = list(X_valid, Y_valid), epochs = 25, callbacks = cp, verbose = 0)
-model %>% fit(X_train, Y_train, validation_split = 0.2, epochs = 25, 
-              callbacks = cp, verbose = 0)
+model %>% fit(X_train, Y_train, validation_data = list(X_valid, Y_valid), 
+              epochs = 50, batch_size = BATCH, verbose = 0, callbacks = cp)
 
-sunspots0[474:526]
+### 
+train_preds = model %>% predict(X_train, batch_size = BATCH, verbose = 0)
+plot(Y_train, type = 'l', lwd = 2); grid()
+lines(train_preds, type = 'l', col = 'red')
+
+valid_preds = model %>% predict(X_valid, batch_size = BATCH, verbose = 0)
+plot(Y_valid, type = 'l', lwd = 2); grid()
+lines(valid_preds, type = 'l', col = 'red')
+###
 
 
 
 
-## Setting loop length
-N = blocks[1, 3]
+
+
+
+
+
+
+M = blocks[1, 3] / 2
 
 ## Initializing vectors
 start = blocks[1,1] - WINDOW_LENGTH; end = blocks[1,1] - FORECAST_LENGTH
 to_predict = tf$constant(sunspots0[start:end])
 preds = c()
 
-for (i in 1:N){
+for (i in 1:M){
   
   ## Expanding dimensions
   to_predict = tf$expand_dims(to_predict, 0L)
@@ -333,11 +356,65 @@ for (i in 1:N){
   preds = c(preds, prediction)
   
   ## Updating prediction vector
+  to_predict = tf$concat(list(to_predict, prediction), axis = 1L)[1][c(2:(WINDOW_LENGTH+1))]
+}
+
+
+
+
+
+
+section2 = sunspots0[(blocks[1,2]+1):length(sunspots0)]
+
+input_set2 = df_to_x_y_new(section2, WINDOW_LENGTH, FORECAST_LENGTH) 
+X2 = input_set2[[1]]
+Y2 = input_set2[[2]]
+
+X_train = tf$constant(X2)
+Y_train = tf$constant(Y2)
+
+dim(X_train)
+dim(Y_train)
+
+
+
+## Initializing vectors
+start = blocks[1,2] + FORECAST_LENGTH; end = blocks[1,2] + WINDOW_LENGTH
+to_predict = tf$constant(rev(sunspots0[start:end]))
+preds2 = c()
+
+for (i in 1:N){
+  
+  ## Expanding dimensions
+  to_predict = tf$expand_dims(to_predict, 0L)
+  
+  ## Predicting on input vector
+  prediction = model %>% predict(to_predict, verbose = 0)
+  
+  ## Saving prediction
+  preds2 = c(preds2, prediction)
+  
+  ## Updating prediction vector
   to_predict = tf$concat(list(to_predict, prediction), axis = 1L)[1][c(2:11)]
 }
 
+train_preds = model %>% predict(X_train)
+
+
+
 plot(sunspots0, type = 'l', lwd = 2); grid()
-lines(blocks[1,1]:blocks[1,2], preds, col = 'dodgerblue')
+lines(blocks[1,1]:(blocks[1,1] + N-1), preds, col = 'dodgerblue')
+lines((blocks[1,1] + N):blocks[1,2], rev(preds2), col = 'green')
+
+
+final_preds = c(preds, rev(preds2))
+
+final_sunspots = ifelse(is.na(sunspots0), final_preds, sunspots0)
+
+plot(final_sunspots, col = 'red', type = 'l'); grid()
+lines(sunspots0, type = 'l', lwd = 2)
+lines(sunspots, type = 'l', col = 'green')
+
 
 
 
