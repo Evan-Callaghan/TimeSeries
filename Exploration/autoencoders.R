@@ -240,33 +240,17 @@ blocks = get_block(sunspots0)
 blocks
 
 ## Creating training sets
-df_to_x_y_new <- function(data, window_length, forecast_length = 1){
+df_to_X_Y <- function(data, window){
   X = c(); Y = c()
-  M = length(data) - window_length #- forecast_length
-  P = window_length + forecast_length
-  
-  ## Forward pass:
+  M = length(data) - window
   for (i in 1:M){
-    row = data[i:(i+window_length-1)]
-    label = data[(i+window_length):(i+P)]
+    row = data[i:(i+window-1)]
+    label = data[(i+window):(i+window+1)]
     X = c(X, row)
     Y = c(Y, label)
   }
-  
-  # ## Backward pass:
-  # data = rev(data)
-  # for (i in 1:M){
-  #   row = data[i:(i+window_length-1)]
-  #   label = data[(i+window_length):(i+P)]
-  #   X = c(X, row)
-  #   Y = c(Y, label)
-  # }
-  # 
-  # X = array(matrix(X, nrow = 2*M, byrow = TRUE), dim = c(2*M, window_length))
-  # Y = array(matrix(Y, nrow = 2*M, byrow = TRUE), dim = c(2*M, forecast_length)) 
-  
-  X = array(matrix(X, nrow = M, byrow = TRUE), dim = c(M, window_length, 1))
-  Y = array(matrix(Y, nrow = M, byrow = TRUE), dim = c(M, forecast_length)) 
+  X = array(matrix(X, nrow = M, byrow = TRUE), dim = c(M, window, 1))
+  Y = array(matrix(Y, nrow = M, byrow = TRUE), dim = c(M, 1)) 
   return(list(X, Y))
 }
 
@@ -282,7 +266,7 @@ BATCH = 15
 #section1 = sunspots0[1:(blocks[1,1]-1)]
 section1 = sunspots0
 
-input_set1 = df_to_x_y_new(section1, WINDOW, FORECAST) 
+input_set1 = df_to_X_Y(section1, WINDOW) 
 X1 = tf$constant(input_set1[[1]])
 Y1 = tf$constant(input_set1[[2]])
 
@@ -354,59 +338,57 @@ X0 = interpTools::simulateGaps(list(X), p = 0.1, g = 10, K = 1)[[1]]$p0.1$g10[[1
 plot(X, type = 'l', lty = 3); grid()
 lines(X0, type = 'l', lwd = 2)
 
-blocks = get_block(X0)
-blocks
-class(blocks)
-
-blocks = cbind(blocks, c(1, 1, 1, 1))
-blocks
-
-blocks[,2] - blocks[,1]
-
 
 
 data_generator <- function(X0, window){
   
-  ## Getting block (missing data info)
-  BLOCK = get_block(X0)
-  
   ## Defining helpful parameters
+  BLOCK = get_block(X0)
   B = dim(BLOCK)[1] + 1
+  N = length(X0)
   INDEX = 1
+  
+  ## Validating gaps 
+  diff = c()
+  for (i in 2:B){
+    if (i == B){
+      diff = c(diff, 1000 - BLOCK[i-1, 2] - 1)}
+    else{
+      diff = c(diff, BLOCK[i,1] - BLOCK[i-1, 2] - 1)}
+  }
+  to_skip = which(diff < (window + 1)) + 1
   
   ## Initializing arrays
   X = c(); Y = c(); 
   
+  ## Looping through each section of data
   for (b in 1:B){
     
-    if (b == B){
-      M = length(X0) - window - 1
-    }
+    ## If the current section is not long enough, skip to next iteration
+    if (b %in% to_skip){print(b)}
     
-    else{
-      M = BLOCK[b,1] - window - 1
-    }
-    
-    for (i in INDEX:M){
+    else {
       
-      row = X0[i:(i+window-1)]
-      target = X0[i+window]
+      ## Setting end of looping section
+      if (b == B){
+        M = N - window - 1}
+      else{
+        M = BLOCK[b,1] - window - 1}
       
-      if (is.na(target)){
-        print(i)
-        print(target)
+      ## Looping through index in section
+      for (i in INDEX:M){
+        row = X0[i:(i+window-1)]; X = c(X, row) ## Appending rows
+        target = X0[i+window]; Y = c(Y, target)    ## Appending labels
       }
-      
-      X = c(X, row)
-      Y = c(Y, target)
     }
-    
+    ## Updating INDEX
     if (b < B){
-      INDEX = BLOCK[b,2] + 1 
-    }
+      INDEX = BLOCK[b,2] + 1}
   }
+  rows = length(X) / window ## Setting number of rows
+  print(sum(is.na(X))); print(sum(is.na(Y)))
   
-  rows = length(X) / window
+  ## Formatting X and Y
   X = array(matrix(X, nrow = rows, byrow = TRUE), dim = c(rows, window, 1))
   Y = array(matrix(Y, nrow = rows, byrow = TRUE), dim = c(rows, 1)) 
   
@@ -455,31 +437,39 @@ valid_preds = model %>% predict(X_valid, batch_size = BATCH, verbose = 0)
 plot(Y_valid, type = 'l', lwd = 2); grid()
 lines(valid_preds, type = 'l', col = 'red')
 
+plot(1:690, as.numeric(Y_train), type = 'l', lwd = 2, xlim = c(1,840)); grid()
+lines(691:840, as.numeric(Y_valid), type = 'l', lwd = 2)
+lines(1:690, as.numeric(train_preds), type = 'l', col = 'red')
+lines(691:840, as.numeric(valid_preds), type = 'l', col = 'dodgerblue')
 
 
 
 
-N = dim(X1)[1]
-#train_size = floor(0.8 * N)
-train_index = 750
-valid_index = 900
-test_index = 990
+## Removing trend component from same series:
+set.seed(52)
+X = interpTools::simXt(N = 1000, numTrend = 1, numFreq = 2)$Xt
+Mt = estimator(X, method = 'Mt')
+X = X - Mt
+X0 = interpTools::simulateGaps(list(X), p = 0.1, g = 10, K = 1)[[1]]$p0.1$g10[[1]]
 
-X_train = X1[1:train_index,,]; Y_train = Y1[1:train_index]
-X_valid = X1[(train_index+1):valid_index,,]; Y_valid = Y1[(train_index+1):valid_index]
-X_test = X1[(valid_index+1):test_index,,]; Y_test = Y1[(valid_index+1):test_index]
+plot(X, type = 'l', lty = 3); grid()
+lines(X0, type = 'l', lwd = 2)
+
+data = data_generator(X0, WINDOW)
+
+X = data[[1]]
+Y = data[[2]]
+
+dim(X)
+dim(Y)
+
+X_train = X[1:690,,]; Y_train = Y[1:690]
+X_valid = X[691:840,,]; Y_valid = Y[691:840]
 
 dim(X_train)
 dim(Y_train)
 dim(X_valid)
 dim(Y_valid)
-dim(X_test)
-dim(Y_test)
-
-model = keras_model_sequential(name = 'Model') %>% 
-  layer_lstm(64, stateful = TRUE, batch_input_shape = c(BATCH, WINDOW, 1)) %>%
-  layer_dense(8, activation = 'relu') %>%
-  layer_dense(FORECAST, activation = 'linear')
 
 summary(model)
 
@@ -489,8 +479,23 @@ cp = tf$keras$callbacks$ModelCheckpoint('Callbacks/weights.{epoch:02d}-{val_loss
 model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
                   loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
 
-model %>% fit(X_train, Y_train, validation_data = list(X_valid, Y_valid), 
-              epochs = 50, batch_size = BATCH, callbacks = cp)
+model %>% fit(X_train, Y_train, epochs = 50, batch_size = BATCH, verbose = 0,
+              validation_data = list(X_valid, Y_valid), callbacks = cp)
+
+train_preds = model %>% predict(X_train, batch_size = BATCH, verbose = 0)
+plot(Y_train, type = 'l', lwd = 2); grid()
+lines(train_preds, type = 'l', col = 'red')
+
+valid_preds = model %>% predict(X_valid, batch_size = BATCH, verbose = 0)
+plot(Y_valid, type = 'l', lwd = 2); grid()
+lines(valid_preds, type = 'l', col = 'red')
+
+plot(1:690, as.numeric(Y_train), type = 'l', lwd = 2, xlim = c(1,840)); grid()
+lines(691:840, as.numeric(Y_valid), type = 'l', lwd = 2)
+lines(1:690, as.numeric(train_preds), type = 'l', col = 'red')
+lines(691:840, as.numeric(valid_preds), type = 'l', col = 'dodgerblue')
+
+interp
 
 
 
@@ -498,19 +503,11 @@ model %>% fit(X_train, Y_train, validation_data = list(X_valid, Y_valid),
 
 
 
-df_to_x_y <- function(data, window_size = 5){
-  X = c(); Y = c(); M = (length(data) - window_size)
-  for (i in 1:M){
-    row = data[i:(i+window_size-1)]
-    label = data[i+window_size]
-    X = c(X, row)
-    Y = c(Y, label)
-  }
-  
-  X = array(matrix(X, nrow = M, byrow = TRUE), dim = c(M, window_size))
-  Y = array(matrix(Y, nrow = M, byrow = TRUE), dim = c(M, 1)) 
-  return(list(X, Y))
-}
+
+
+
+
+
 
 
 
