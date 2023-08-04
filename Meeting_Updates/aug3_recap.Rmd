@@ -1,0 +1,26 @@
+---
+title: "August 3 Update"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(interpTools)
+library(tensorflow)
+library(keras)
+```
+
+## Simulating a Modulated Signal
+
+From Kian's thesis we have the following formula for signals with frequency modulation:
+
+$$X_t = \sum_m{\mu_mcos(2 \pi f_mt + 2 \pi \int_0^t \phi_m (\tau) \space d\tau)} + Z_t$$
+
+Now let $\theta(t) = 2 \pi f_mt + 2 \pi \int_0^t \phi_m (\tau) \space d\tau$. Since $\phi$ and $\theta$ are both polynomials, we can simplify to:
+
+$$\phi(\tau) = \sum_{p=0}^{P}{a_p\tau^p}$$
+$$\theta(t) = 2 \pi f_mt + 2 \pi \int_0^t \sum_{p=0}^{P}{a_p\tau^p} \space d\tau$$
+$$\theta(t) = 2 \pi f_mt + 2 \pi \sum_{p=0}^{P}{\frac{a_p}{p+1}t^{p+1}}$$
+
+Using these formulas I wrote a function to simulate a modulated signal given a length $N$, number of frequencies $m$, and the maximim degree of polynomial to consider $P$.
