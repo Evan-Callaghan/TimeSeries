@@ -33,6 +33,8 @@ check = mask[1]
 
 
 
+
+
 storage = c()
 for (i in 1:N){
   
