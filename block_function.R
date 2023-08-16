@@ -52,6 +52,22 @@ mask = which(is.na(X0))
 
 
 
+N = length(X0)
+for (i in 1:N){
+  
+  if (is.na(X0[i])){
+    start = i
+      
+    while (is.na(X0[i])){
+      end = i
+      i = i + 1
+    }
+    valid = FALSE
+  }
+}
+
+
+
 
 
 
@@ -94,6 +110,50 @@ if(blocks[length(blocks[,1]),2]==Nlen) {
   
   
   
+
   
-  as.data.frame(blocks) %>% dplyr::rename(Start = V1, End = V2, Gap = V3)
+  
+  
+  
+  
+  
+  
+findBlocks <- function(mask) {
+  Nlen <- length(mask)
+  mask <- which(is.na(mask))
+  # case: there are missing points
+  if(length(mask) > 0) {
+    diffs <- mask[-1] - mask[-length(mask)]
+    diffs <- which(diffs > 1)
+    
+    # case: 1 gap only, possibly no gaps
+    if(length(diffs)==0) {
+      blocks <- matrix(data=0, nrow=1, ncol=3)
+      blocks[1, 1:2] <- c(mask[1], mask[length(mask)])
+    } else {
+      blocks <- matrix(data=0,nrow=length(mask),ncol=3)
+      blocks[1, 1] <- mask[1]
+      blocks[1, 2] <- mask[diffs[1]]
+      k <- 1
+      for(j in 1:length(diffs)) {
+        k <- k+1
+        blocks[k, 1:2] <- c(mask[diffs[j]+1],mask[diffs[j+1]])
+      }
+      blocks[k,2] <- max(mask)
+      blocks <- blocks[1:k, ]
+    }
+    blocks[,3] <- blocks[,2] - blocks[,1] + 1
+    
+    # checks to remove start/end of sequence
+    if(blocks[1,1]==1) {
+      blocks <- blocks[-1, ]
+    }
+    if(blocks[length(blocks[,1]),2]==Nlen) {
+      blocks <- blocks[-length(blocks[,1]), ] 
+    }
+  } else {
+    blocks <- NULL
+  }
+  blocks
+}
   
