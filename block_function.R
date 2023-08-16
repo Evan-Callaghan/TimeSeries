@@ -53,6 +53,8 @@ mask = which(is.na(X0))
 
 
 
+
+
 N = length(X0)
 diffs = which(mask[-1] - mask[-length(mask)] > 1)
 
