@@ -4,9 +4,42 @@
 
 library(dplyr)
 library(interpTools)
+library(tsinterp)
 
 block_function <- function(x, window, forecast){
   
+  ## Getting missing block from findBlock' function
+  mask = ifelse(is.na(x), NA, TRUE)
+  missing_block = findMissingBlock(mask)
+  
+  ## Defining helpful parameters and initializing data-frame
+  N = length(X0)
+  M = dim(missing_block)[1] + 1
+  training_block = data.frame(Start=rep(NA,M), End=rep(NA,M), Gap=rep(NA,M), Train=rep(NA,M))
+  
+  ## Setting values in training_block for each of the M intervals
+  for (i in 1:M){
+    if (i == 1){
+      training_block[i,1:2] = c(1, missing_block$Start[1]-1) 
+    }
+    else if (i == M){
+      training_block[i,1:2] = c(missing_block$End[i-1]+1, N)
+    }
+    else{
+      training_block[i,1:2] = c(missing_block$End[i-1]+1, missing_block$Start[i]-1)}
+  }
+  
+  ## Updating final variables from training block
+  training_block$Gap = training_block$End - training_block$Start + 1
+  training_block$Train = TRUE
+  
+  ## Combining missing and training blocks
+  block = rbind(missing_block, training_block) %>% dplyr::arrange(Start)
+  
+  ## Specifying which data blocks are valid for training process
+  block$Valid = ifelse(block$Train == FALSE, NA, 
+                       ifelse(block$Gap >= (window + forecast), TRUE, FALSE))
+  return(block)
 }
 
 
@@ -14,50 +47,16 @@ set.seed(52)
 X = interpTools::simXt(N = 100, numTrend = 1, numFreq = 2)$Xt
 X0 = interpTools::simulateGaps(list(X), p = 0.1, g = 2, K = 1)[[1]]$p0.1$g2[[1]]
 
+my_block = block_function(X0, window = 5, forecast = 1)
+
+which(my_block$Valid == TRUE)
 
 
 
 
 
-mask = ifelse(is.na(X0), NA, TRUE)
-missing_block = findBlocks(mask)
-missing_block
-
-N = length(X0)
-M = dim(missing_block)[1] + 1
-WINDOW = 5
-FORECAST = 1
-training_block = data.frame(Start = rep(NA, M), End = rep(NA, M), 
-                            Gap = rep(NA, M), Train = rep(NA, M))
-
-for (i in 1:M){
-  if (i == 1){
-    training_block[i,1:2] = c(1, missing_block$Start[1]-1) 
-  }
-  else if (i == M){
-    training_block[i,1:2] = c(missing_block$End[i-1]+1, N)
-  }
-  else{
-    training_block[i,1:2] = c(missing_block$End[i-1]+1, missing_block$Start[i]-1)
-  }
-}
-training_block$Gap = training_block$End - training_block$Start + 1
-training_block$Train = TRUE
-
-
-block = rbind(missing_block, training_block) %>% dplyr::arrange(Start)
-block$Valid = ifelse(block$Train == FALSE, NA, 
-       ifelse(block$Gap >= (WINDOW + FORECAST), TRUE, FALSE))
-
-block
-
-
-
-
-
-
-
-  
+training_index = which(my_block$Valid == TRUE)
+prediction_index = which(is.na(my_block$Valid))
   
 
   
@@ -65,9 +64,11 @@ block
   
   
   
-  
-  
-findBlocks <- function(mask) {
+## findMissingBlock function adapted from tsinterp's findBlocks function
+##
+## Takes data mask as input and returns block info.
+
+findMissingBlock <- function(mask) {
   Nlen <- length(mask)
   mask <- which(is.na(mask))
   # case: there are missing points
