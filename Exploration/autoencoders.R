@@ -1,6 +1,8 @@
 library(tensorflow)
 library(keras)
 
+
+## Configuring TensorFlow set-up
 gpus = tf$config$experimental$list_physical_devices('GPU')
 for (gpu in gpus){
   tf$config$experimental$set_memory_growth(gpu, TRUE)
@@ -608,8 +610,6 @@ lines(preds, type = 'l', col = 'red')
 preds = model %>% predict(X_train)
 plot(Y_train, type = 'l', lwd = 2); grid()
 lines(preds, type = 'l', col = 'red')
-
-
 
 
 
