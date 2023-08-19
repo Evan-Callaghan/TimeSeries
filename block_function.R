@@ -115,6 +115,8 @@ blocking <- function(x, window, forecast){
   ## If necessary, returning error that entire series is NA
   if (sum(is.na(x)) == length(x)){print('Entire series is NA.'); return(NULL)}
   
+  
+  
   ## If necessary, removing missing values from beginning and end of series
   while(is.na(x[1])){x = x[-1]}
   while(is.na(x[length(x)])){x = x[-length(x)]}
