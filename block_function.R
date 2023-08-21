@@ -117,6 +117,7 @@ blocking <- function(x, window, forecast){
   
   
   
+  
   ## If necessary, removing missing values from beginning and end of series
   while(is.na(x[1])){x = x[-1]}
   while(is.na(x[length(x)])){x = x[-length(x)]}
