@@ -200,36 +200,56 @@ data_generator <- function(x, window, forecast){
 }
 
 
-
-
-
-
-
-fit_model <- function(X_train, Y_train){
+#' fit_model
+#' 
+#' This function is to be used to build, fit, and compile an LSTM neural network model using the
+#' provided training data. Since we are using a rolling prediction window, model needs to be able
+#' to predict on a single observation. Therefore, we fit a model using a specified batch size, 
+#' extracted the fitted weights, and build a new model using the copied weights and a batch
+#' size of one (which will allow us to create the rolling prediction window). This function 
+#' returns the final single item model that will be used for predictions.
+#' @param X_train {tensor}; Tensor containing the training input
+#' @param Y_train {tensor}; Tensor containing the training targets
+#' @param window {int}; The number of time points in the past to consider when forecasting
+#' @param forecast {int}; The number of time points to forecast
+#'
+fit_model <- function(X_train, Y_train, window, forecast){
+  
   ## Defining parameters
-  BATCH = 20  ## Must be a factor of length(training_data)
-  WINDOW = 5
+  BATCH = 20  
+  EPOCHS = 50
+  
+  ## *********
+  ## Need to be careful with:
+  ## BATCH: Must be a factor of length(training_data)
+  ## validation_split: batch sizes need to conform
   
   ## Building the model
   model = keras_model_sequential(name = 'Model') %>% 
-    layer_lstm(64, stateful = FALSE, batch_input_shape = c(BATCH, WINDOW, 1)) %>%
+    layer_lstm(64, stateful = FALSE, batch_input_shape = c(BATCH, window, 1)) %>%
     layer_dense(8, activation = 'relu') %>%
     layer_dense(1, activation = 'linear')
   
+  ## Compiling 
   model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
                     loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
+  ## Fitting
+  model %>% fit(X_train, Y_train, shuflle = TRUE, validation_split = 0.25, 
+                epochs = EPOCHS, batch_size = BATCH, verbose = 0)
   
-  model %>% fit(X_train, Y_train, verbose = 0, epochs = 50, batch_size = BATCH)
-  
+  ## Extracting fitted weights
   fitted_weights = model %>% get_weights()
   
+  ## Rebuilding model for batch size of one
   single_item_model = keras_model_sequential(name = 'Model') %>% 
-    layer_lstm(64, stateful = FALSE, batch_input_shape = c(1, WINDOW, 1)) %>%
+    layer_lstm(64, stateful = FALSE, batch_input_shape = c(1, window, 1)) %>%
     layer_dense(8, activation = 'relu') %>%
     layer_dense(1, activation = 'linear')
   
+  ## Copying weights from fitted model
   single_item_model %>% set_weights(fitted_weights)
   
+  ## Returning the newly compiled model
   single_item_model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
                                 loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
   return(single_item_model)
@@ -237,11 +257,6 @@ fit_model <- function(X_train, Y_train){
 
 
 
-
-
-
-X0
-rev(X0)
 
 
 
@@ -286,18 +301,22 @@ for (i in 5:1){
 
 
 
-## EXAMPLE:
+## EXAMPLE 1: Single gap
 ## ---------------------
+
 set.seed(10)
 X = interpTools::simTt(N = 500, numFreq = 2, b = c(100, 200))$value
 X0 = X; X0[200:249] = NA
-
 plot(X, type = 'l', col = 'red'); grid()
 lines(X0, type = 'l', lwd = 2)
 
 
+## Defining parameters
+window = 5
+forecast = 1
+
 ## Generating training and testing data
-data = data_generator(X0, window = 10, forecast = 1)
+data = data_generator(X0, window = window, forecast = forecast)
 
 X_train = data[[1]]
 Y_train = data[[2]]
@@ -309,107 +328,69 @@ dim(Y_train)
 dim(X_test_forward)
 dim(X_test_backward)
 
-
-
-X_train[185:189,,]
-Y_train[185:189,]
-
-X_test_forward
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Fitting the model on training data
-model = fit_model(X_train, Y_train)
+model = fit_model(X_train, Y_train, window, forecast)
 
-## Creating rolling prediction window (forward pass)
-n_missing = sum(is.na(X0))
-interps = c()
-for (i in 1:n_missing){
+## Creating rolling prediction window
+rolling_prediction <- function(model, x, X_test){
   
-  ## Predicting on current input
-  test_preds = model %>% predict(X_test_forward, batch_size = 1, verbose = 0)
+  ## Defining helpful parameters
+  rolling_length = sum(is.na(x))
+  preds = c()
   
-  ## Appending results
-  interps = c(interps, test_preds)
-  
-  ## Updating 
-  X_test_forward = c(X_test_forward, test_preds)[-1]
-  dim(X_test_forward) = c(1, 5, 1)
+  for (i in 1:rolling_length){
+    
+    ## Predicting on current input
+    pred = model %>% predict(tf$constant(X_test), batch_size = 1, verbose = 0) %>% as.numeric()
+    
+    ## Appending results
+    preds = c(preds, pred)
+    
+    ## Updating prediction series
+    X_test = c(as.numeric(X_test), pred)[-1]
+    dim(X_test) = c(1, 5, 1)
+  }
+  return(preds)
 }
 
-interps
+forward_preds = rolling_prediction(model, X0, X_test_forward)
+backward_preds = rev(rolling_prediction(model, X0, X_test_backward))
 
-
-plot(150:249, X[150:249], type = 'l', col = 'red'); grid()
-lines(150:249, X0[150:249], type = 'l', lwd = 2)
-lines(200:249, interps, type = 'l', col = 'dodgerblue')
-
-
-
-
-
-
-## Visualizing predictions 
-train_preds = model %>% predict(X_train, batch_size = BATCH, verbose = 0)
-valid_preds = model %>% predict(X_test_forward, verbose = 0)
-
-plot(1:880, Y_train, type = 'l', lwd = 2, xlim = c(1, 880), main = 'Sunspots Data with LSTM Model', 
-     ylab = 'Sunspots', xlab = 'Month'); grid()
-lines(1201:1485, Y_valid, type = 'l', lwd = 2)
-lines(1:1200, train_preds, type = 'l', col = 'red')
-lines(1201:1485, valid_preds, type = 'l', col = 'dodgerblue')
-legend(legend = c('Training', 'Validation'), lty = 1, lwd = 4, cex = 0.8,
-       col = c('red', 'dodgerblue'), 'topleft', title = 'LSTM Predictions')
-
-
-
-
-
-
-
-
-data = interpTools::simXt(N = 1000)$Xt
-window = 20
-forecast = 5
-X = c(); Y = c()
-M = length(data) - window
-P = forecast - 1
-for (i in 1:M){
-  row = data[i:(i+window-1)]
-  label = data[(i+window):(i+window+P)]
-  X = c(X, row)
-  Y = c(Y, label)
+## Plotting the forward and backward predictions
+plot_results <- function(forward_preds, backward_preds){
+  par(mfrow = c(2, 1), oma = c(4, 4, 4, 4), mar = c(2, 2, 2, 1), xpd = FALSE)
+  
+  plot(175:275, X[175:275], type = 'l', lty = 3, ylim = c(-350, 375),
+       xlab = NA, ylab = NA); grid()
+  lines(175:275, X0[175:275], type = 'l', lwd = 2)
+  lines(200:249, forward_preds, type = 'l', col = 'dodgerblue', lwd = 1.5)
+  legend('topright', legend = c('Forward Pass'), col = c('dodgerblue'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  plot(175:275, X[175:275], type = 'l', lty = 3, ylim = c(-350, 375), 
+       xlab = NA, ylab = NA); grid()
+  lines(175:275, X0[175:275], type = 'l', lwd = 2)
+  lines(200:249, backward_preds, type = 'l', col = 'red', lwd = 1.5)
+  legend('topright', legend = c('Backward Pass'), col = c('red'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  title(main = 'LSTM Network Results', xlab = 'Time', ylab = 'X', 
+        outer = TRUE, line = 0, cex.main = 2) 
 }
-X = array(matrix(X, nrow = M, byrow = TRUE), dim = c(M, window, 1))
-Y = array(matrix(Y, nrow = M, byrow = TRUE), dim = c(M, forecast))
+plot_results(forward_preds, backward_preds)
 
-dim(X)
-dim(Y)
-
-X[1:5,,]
-Y[1:5,]
+## Computing prediction performance
+X_for = X0; X_for[which(is.na(X0))] = forward_preds
+X_back = X0; X_back[which(is.na(X0))] = backward_preds
+X_hybrid = X0; X_hybrid[which(is.na(X0))] = (forward_preds+backward_preds)/2
 
 
-
-
-
-
-
-
-
-
+interpTools::
+  
+  
+  
+  
+  
+  
+  
+  
