@@ -147,12 +147,14 @@ series_to_X_Y <- function(x, window, forecast){
   Y_train = array(matrix(Y_train, nrow = M, byrow = TRUE), dim = c(M, forecast))
   
   ## Generating testing data
-  for (idx in test_indices){
-    start_idx = block[idx,]$Start - window
-    end_idx = block[idx,]$Start - 1
-    X_test = c(X_test, x[start_idx:end_idx])
+  if (length(test_indices) > 0){
+    for (idx in test_indices){
+      start_idx = block[idx,]$Start - window
+      end_idx = block[idx,]$Start - 1
+      X_test = c(X_test, x[start_idx:end_idx])
+    }
+    X_test = array(matrix(X_test, nrow = n_test_indices, byrow = TRUE), dim = c(n_test_indices, window, 1))
   }
-  X_test = array(matrix(X_test, nrow = n_test_indices, byrow = TRUE), dim = c(n_test_indices, window, 1))
   return(list(X_train, Y_train, X_test))
 }
 
@@ -193,8 +195,8 @@ data_generator <- function(x, window, forecast){
   ## Converting to tensors
   X_train = tf$constant(X_train)
   Y_train = tf$constant(Y_train)
-  X_test_for = tf$constant(X_test_for)
-  X_test_back = tf$constant(X_test_back)
+  if (!is.null(X_test_for)){X_test_for = tf$constant(X_test_for)}
+  if (!is.null(X_test_back)){X_test_for = tf$constant(X_test_back)}
   
   return(list(X_train, Y_train, X_test_for, X_test_back))
 }
@@ -216,8 +218,8 @@ data_generator <- function(x, window, forecast){
 fit_model <- function(X_train, Y_train, window, forecast){
   
   ## Defining parameters
-  BATCH = 20  
-  EPOCHS = 50
+  BATCH = 30  
+  EPOCHS = 60
   
   ## *********
   ## Need to be careful with:
@@ -234,7 +236,7 @@ fit_model <- function(X_train, Y_train, window, forecast){
   model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
                     loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
   ## Fitting
-  model %>% fit(X_train, Y_train, shuflle = TRUE, validation_split = 0.25, 
+  model %>% fit(X_train, Y_train, shuflle = FALSE,
                 epochs = EPOCHS, batch_size = BATCH, verbose = 0)
   
   ## Extracting fitted weights
@@ -265,38 +267,9 @@ fit_model <- function(X_train, Y_train, window, forecast){
 ## How do we properly sort the X_test_forward and backward matrices? Makes a difference
 ## when we have more than one missing region.
 
-## Remember to use tf$constant() to create tensor objects
 
 
 
-
-set.seed(10)
-X = interpTools::simTt(N = 500, numFreq = 2, b = c(100, 200))$value
-X0 = X; X0[c(200:224, 375:399)] = NA
-
-plot(X, type = 'l', col = 'red'); grid()
-lines(X0, type = 'l', lwd = 2)
-
-
-data = data_generator(X0, window = 10, forecast = 1)
-
-X_train = data[[1]]
-Y_train = data[[2]]
-X_test_forward = data[[3]]
-X_test_backward = data[[4]]
-
-
-
-X_test_backward
-
-
-
-
-for (i in 5:1){
-  ## Perform rolling window
-  ## reverse preds
-  
-}
 
 
 
@@ -305,8 +278,11 @@ for (i in 5:1){
 ## ---------------------
 
 set.seed(10)
-X = interpTools::simTt(N = 500, numFreq = 2, b = c(100, 200))$value
-X0 = X; X0[200:249] = NA
+X = interpTools::simXt(N = 500, numFreq = 2, b = c(100, 200), numTrend = 0)$Xt
+X_gapped = interpTools::simulateGaps(list(X), p = 0.1, g = 50, K = 1)
+X0 = X_gapped[[1]]$p0.1$g50[[1]]
+
+#X0 = X; X0[200:249] = NA
 plot(X, type = 'l', col = 'red'); grid()
 lines(X0, type = 'l', lwd = 2)
 
@@ -332,7 +308,7 @@ dim(X_test_backward)
 model = fit_model(X_train, Y_train, window, forecast)
 
 ## Creating rolling prediction window
-rolling_prediction <- function(model, x, X_test){
+rolling_prediction <- function(model, x, X_test, window){
   
   ## Defining helpful parameters
   rolling_length = sum(is.na(x))
@@ -348,29 +324,29 @@ rolling_prediction <- function(model, x, X_test){
     
     ## Updating prediction series
     X_test = c(as.numeric(X_test), pred)[-1]
-    dim(X_test) = c(1, 5, 1)
+    dim(X_test) = c(1, window, 1)
   }
   return(preds)
 }
 
-forward_preds = rolling_prediction(model, X0, X_test_forward)
-backward_preds = rev(rolling_prediction(model, X0, X_test_backward))
+forward_preds = rolling_prediction(model, X0, X_test_forward, window)
+backward_preds = rev(rolling_prediction(model, X0, X_test_backward, window))
 
 ## Plotting the forward and backward predictions
 plot_results <- function(forward_preds, backward_preds){
   par(mfrow = c(2, 1), oma = c(4, 4, 4, 4), mar = c(2, 2, 2, 1), xpd = FALSE)
   
-  plot(175:275, X[175:275], type = 'l', lty = 3, ylim = c(-350, 375),
+  plot(375:475, X[375:475], type = 'l', lty = 3, ylim = c(-500, 500),
        xlab = NA, ylab = NA); grid()
-  lines(175:275, X0[175:275], type = 'l', lwd = 2)
-  lines(200:249, forward_preds, type = 'l', col = 'dodgerblue', lwd = 1.5)
+  lines(375:475, X0[375:475], type = 'l', lwd = 2)
+  lines(412:461, forward_preds, type = 'l', col = 'dodgerblue', lwd = 1.5)
   legend('topright', legend = c('Forward Pass'), col = c('dodgerblue'), 
          pch = 16, bty = 'n', cex = 1.2)
   
-  plot(175:275, X[175:275], type = 'l', lty = 3, ylim = c(-350, 375), 
+  plot(375:475, X[375:475], type = 'l', lty = 3, ylim = c(-500, 500), 
        xlab = NA, ylab = NA); grid()
-  lines(175:275, X0[175:275], type = 'l', lwd = 2)
-  lines(200:249, backward_preds, type = 'l', col = 'red', lwd = 1.5)
+  lines(375:475, X0[375:475], type = 'l', lwd = 2)
+  lines(412:461, backward_preds, type = 'l', col = 'red', lwd = 1.5)
   legend('topright', legend = c('Backward Pass'), col = c('red'), 
          pch = 16, bty = 'n', cex = 1.2)
   
@@ -382,15 +358,66 @@ plot_results(forward_preds, backward_preds)
 ## Computing prediction performance
 X_for = X0; X_for[which(is.na(X0))] = forward_preds
 X_back = X0; X_back[which(is.na(X0))] = backward_preds
-X_hybrid = X0; X_hybrid[which(is.na(X0))] = (forward_preds+backward_preds)/2
+X_hybrid = X0; X_hybrid[412:436] = X_for[412:436]; X_hybrid[437:461] = X_back[437:461]; 
+
+#X_hybrid[which(is.na(X0))] = (forward_preds+backward_preds)/2
+X_hwi = interpTools::parInterpolate(X_gapped, methods = c('HWI'))[[1]]$HWI$p0.1$g50[[1]]
+
+## Plotting forward/backward hybrid predictions vs. HWI imputation
+plot_results2 <- function(){
+  par(mfrow = c(2, 1), oma = c(4, 4, 4, 4), mar = c(2, 2, 2, 1), xpd = FALSE)
+  
+  plot(375:475, X[375:475], type = 'l', lty = 3, ylim = c(-500, 500),
+       xlab = NA, ylab = NA); grid()
+  lines(375:475, X0[375:475], type = 'l', lwd = 2)
+  lines(412:461, X_hybrid[412:461], type = 'l', col = 'darkorange', lwd = 1.5)
+  legend('topright', legend = c('LSTM Hybrid'), col = c('darkorange'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  plot(375:475, X[375:475], type = 'l', lty = 3, ylim = c(-500, 500), 
+       xlab = NA, ylab = NA); grid()
+  lines(375:475, X0[375:475], type = 'l', lwd = 2)
+  lines(412:461, X_hwi[412:461], type = 'l', col = 'forestgreen', lwd = 1.5)
+  legend('topright', legend = c('HWI'), col = c('forestgreen'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  title(main = 'LSTM Network Results', xlab = 'Time', ylab = 'X', 
+        outer = TRUE, line = 0, cex.main = 2) 
+}
+plot_results2()
+
+## Computing performance metrics
+print(paste0('LSTM RMSE: ', round(sqrt(mean((X - X_hybrid)^2)), 3)))
+print(paste0('HWI RMSE: ', round(sqrt(mean((X - X_hwi)^2)), 3)))
+
+print(paste0('LSTM MAE: ', round(mean(abs(X - X_hybrid)), 3)))
+print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
 
 
-interpTools::
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+## Try fitting a final model on the hybrid data and then predict on the full
+## training set. Change so we only have a forward pass.
+data = data_generator(X_hybrid, window = window, forecast = forecast)
+
+
+X_train = data[[1]]
+Y_train = data[[2]]
+
+dim(X_train)
+dim(Y_train)
+
+
+model = fit_model(X_train, Y_train, window, forecast)
+
+
+final_preds = model %>% predict(X_train, batch_size = 1, verbose = 0)
+
+
+
+
