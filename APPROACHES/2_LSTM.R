@@ -195,8 +195,8 @@ data_generator <- function(x, window, forecast){
   ## Converting to tensors
   X_train = tf$constant(X_train)
   Y_train = tf$constant(Y_train)
-  if (!is.null(X_test_for)){X_test_for = tf$constant(X_test_for)}
-  if (!is.null(X_test_back)){X_test_for = tf$constant(X_test_back)}
+  #if (!is.null(X_test_for)){X_test_for = tf$constant(X_test_for)}
+  #if (!is.null(X_test_back)){X_test_back = tf$constant(X_test_back)}
   
   return(list(X_train, Y_train, X_test_for, X_test_back))
 }
@@ -215,10 +215,9 @@ data_generator <- function(x, window, forecast){
 #' @param window {int}; The number of time points in the past to consider when forecasting
 #' @param forecast {int}; The number of time points to forecast
 #'
-fit_model <- function(X_train, Y_train, window, forecast){
+fit_model <- function(X_train, Y_train, window, forecast, batch, validation_split){
   
   ## Defining parameters
-  BATCH = 30  
   EPOCHS = 60
   
   ## *********
@@ -228,7 +227,7 @@ fit_model <- function(X_train, Y_train, window, forecast){
   
   ## Building the model
   model = keras_model_sequential(name = 'Model') %>% 
-    layer_lstm(64, stateful = FALSE, batch_input_shape = c(BATCH, window, 1)) %>%
+    layer_lstm(64, stateful = FALSE, batch_input_shape = c(batch, window, 1)) %>%
     layer_dense(8, activation = 'relu') %>%
     layer_dense(1, activation = 'linear')
   
@@ -236,8 +235,8 @@ fit_model <- function(X_train, Y_train, window, forecast){
   model %>% compile(optimizer = optimizer_adam(learning_rate = 0.001), 
                     loss = 'MeanSquaredError', metrics = 'MeanAbsoluteError')
   ## Fitting
-  model %>% fit(X_train, Y_train, shuflle = FALSE,
-                epochs = EPOCHS, batch_size = BATCH, verbose = 0)
+  model %>% fit(X_train, Y_train, shuflle = FALSE, validation_split = validation_split,
+                epochs = EPOCHS, batch_size = batch, verbose = 0)
   
   ## Extracting fitted weights
   fitted_weights = model %>% get_weights()
@@ -277,6 +276,7 @@ fit_model <- function(X_train, Y_train, window, forecast){
 ## EXAMPLE 1: Single gap
 ## ---------------------
 
+dev.off()
 set.seed(10)
 X = interpTools::simXt(N = 500, numFreq = 2, b = c(100, 200), numTrend = 0)$Xt
 X_gapped = interpTools::simulateGaps(list(X), p = 0.1, g = 50, K = 1)
@@ -305,7 +305,7 @@ dim(X_test_forward)
 dim(X_test_backward)
 
 ## Fitting the model on training data
-model = fit_model(X_train, Y_train, window, forecast)
+model = fit_model(X_train, Y_train, window, forecast, batch = 20, validation_split = 0.25)
 
 ## Creating rolling prediction window
 rolling_prediction <- function(model, x, X_test, window){
@@ -387,9 +387,13 @@ plot_results2 <- function(){
 plot_results2()
 
 ## Computing performance metrics
-print(paste0('LSTM RMSE: ', round(sqrt(mean((X - X_hybrid)^2)), 3)))
+print(paste0('LSTM RMSE (forward): ', round(sqrt(mean((X - X_for)^2)), 3)))
+print(paste0('LSTM RMSE (backward): ', round(sqrt(mean((X - X_back)^2)), 3)))
+print(paste0('LSTM RMSE (hybrid): ', round(sqrt(mean((X - X_hybrid)^2)), 3)))
 print(paste0('HWI RMSE: ', round(sqrt(mean((X - X_hwi)^2)), 3)))
 
+print(paste0('LSTM MAE: ', round(mean(abs(X - X_for)), 3)))
+print(paste0('LSTM MAE: ', round(mean(abs(X - X_back)), 3)))
 print(paste0('LSTM MAE: ', round(mean(abs(X - X_hybrid)), 3)))
 print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
 
@@ -400,23 +404,143 @@ print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
 
 
 
+## EXAMPLE 2: Multiple gaps
+## ---------------------
 
-## Try fitting a final model on the hybrid data and then predict on the full
-## training set. Change so we only have a forward pass.
-data = data_generator(X_hybrid, window = window, forecast = forecast)
+dev.off()
+set.seed(10)
+X = interpTools::simXt(N = 500, numTrend = 0)$Xt
+X_gapped = interpTools::simulateGaps(list(X), p = 0.2, g = 25, K = 1)
+X0 = X_gapped[[1]]$p0.2$g25[[1]]
 
+plot(X, type = 'l', col = 'red'); grid()
+lines(X0, type = 'l', lwd = 2)
+
+
+## Defining parameters
+window = 5
+forecast = 1
+
+## Generating training and testing data
+data = data_generator(X0, window = window, forecast = forecast)
 
 X_train = data[[1]]
 Y_train = data[[2]]
+X_test_forward = data[[3]]
+X_test_backward = data[[4]]
 
 dim(X_train)
 dim(Y_train)
+dim(X_test_forward)
+dim(X_test_backward)
 
+## Fitting the model on training data
+model = fit_model(X_train, Y_train, window, forecast, batch = 38, validation_split = 0.25)
 
-model = fit_model(X_train, Y_train, window, forecast)
+## Creating rolling prediction window
+rolling_prediction <- function(model, x, X_test, window, block){
+  
+  ## Defining helpful parameters
+  preds = c()
+  
+  for (i in 1:dim(X_test)[1]){
+    
+    rolling_length = block[i]
+    input = X_test[i,,]; dim(input) = c(1, window, 1)
+    
+    for (j in 1:rolling_length){
+      
+      ## Predicting on current input
+      
+      pred = model %>% predict(tf$constant(input), batch_size = 1, verbose = 0) %>% as.numeric()
+      
+      ## Appending results
+      preds = c(preds, pred)
+      
+      ## Updating prediction series
+      input = c(as.numeric(input), pred)[-1]
+      dim(input) = c(1, window, 1)
+    }
+  }
+  return(preds)
+}
 
+forward_preds = rolling_prediction(model, X0, X_test_forward, window, block = c(25, 25, 50))
+backward_preds = rolling_prediction(model, X0, X_test_backward, window, block = c(50, 25, 25))
 
-final_preds = model %>% predict(X_train, batch_size = 1, verbose = 0)
+## Finalizing X_for and X_back
+X_for = X; X_for[61:85] = forward_preds[1:25]; X_for[181:205] = forward_preds[26:50]; X_for[294:343] = forward_preds[51:100];
+X_back = X; X_back[61:85] = rev(backward_preds[76:100]); X_back[181:205] = rev(backward_preds[51:75]); X_back[294:343] = rev(backward_preds[1:50]);
+
+## Plotting the forward and backward predictions
+plot_results <- function(){
+  par(mfrow = c(2, 1), oma = c(4, 4, 4, 4), mar = c(2, 2, 2, 1), xpd = FALSE)
+  
+  plot(1:350, X[1:350], type = 'l', lty = 3, ylim = c(-30, 30),
+       xlab = NA, ylab = NA); grid()
+  lines(1:350, X0[1:350], type = 'l', lwd = 2)
+  lines(61:85, X_for[61:85], type = 'l', col = 'dodgerblue', lwd = 1.5)
+  lines(181:205, X_for[181:205], type = 'l', col = 'dodgerblue', lwd = 1.5)
+  lines(294:343, X_for[294:343], type = 'l', col = 'dodgerblue', lwd = 1.5)
+  legend('topright', legend = c('Forward Pass'), col = c('dodgerblue'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  plot(1:350, X[1:350], type = 'l', lty = 3, ylim = c(-30, 30),
+       xlab = NA, ylab = NA); grid()
+  lines(1:350, X0[1:350], type = 'l', lwd = 2)
+  lines(61:85, X_back[61:85], type = 'l', col = 'red', lwd = 1.5)
+  lines(181:205, X_back[181:205], type = 'l', col = 'red', lwd = 1.5)
+  lines(294:343, X_back[294:343], type = 'l', col = 'red', lwd = 1.5)
+  legend('topright', legend = c('Backward Pass'), col = c('red'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  title(main = 'LSTM Network Results', xlab = 'Time', ylab = 'X', 
+        outer = TRUE, line = 0, cex.main = 2) 
+}
+plot_results()
+
+## Computing prediction performance
+X_hy = X0; X_hy[61:73] = X_for[61:73]; X_hy[74:85] = X_back[74:85]; X_hy[181:193] = X_for[181:193]; X_hy[194:205] = X_back[194:205]; X_hy[294:318] = X_for[294:318]; X_hy[319:343] = X_back[319:343]
+X_hwi = interpTools::parInterpolate(X_gapped, methods = c('HWI'))[[1]]$HWI$p0.2$g25[[1]]
+
+## Plotting forward/backward hybrid predictions vs. HWI imputation
+plot_results2 <- function(){
+  par(mfrow = c(2, 1), oma = c(4, 4, 4, 4), mar = c(2, 2, 2, 1), xpd = FALSE)
+  
+  plot(1:350, X[1:350], type = 'l', lty = 3, ylim = c(-30, 30),
+       xlab = NA, ylab = NA); grid()
+  lines(1:350, X0[1:350], type = 'l', lwd = 2)
+  lines(61:85, X_hy[61:85], type = 'l', col = 'darkorange', lwd = 1.5)
+  lines(181:205, X_hy[181:205], type = 'l', col = 'darkorange', lwd = 1.5)
+  lines(294:343, X_hy[294:343], type = 'l', col = 'darkorange', lwd = 1.5)
+  legend('topright', legend = c('LSTM Hybrid'), col = c('darkorange'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  plot(1:350, X[1:350], type = 'l', lty = 3, ylim = c(-30, 30),
+       xlab = NA, ylab = NA); grid()
+  lines(1:350, X0[1:350], type = 'l', lwd = 2)
+  lines(61:85, X_hwi[61:85], type = 'l', col = 'forestgreen', lwd = 1.5)
+  lines(181:205, X_hwi[181:205], type = 'l', col = 'forestgreen', lwd = 1.5)
+  lines(294:343, X_hwi[294:343], type = 'l', col = 'forestgreen', lwd = 1.5)
+  legend('topright', legend = c('HWI'), col = c('forestgreen'), 
+         pch = 16, bty = 'n', cex = 1.2)
+  
+  title(main = 'LSTM Network Results', xlab = 'Time', ylab = 'X', 
+        outer = TRUE, line = 0, cex.main = 2) 
+}
+plot_results2()
+
+## Computing performance metrics
+print(paste0('LSTM RMSE (forward): ', round(sqrt(mean((X - X_for)^2)), 3)))
+print(paste0('LSTM RMSE (backward): ', round(sqrt(mean((X - X_back)^2)), 3)))
+print(paste0('LSTM RMSE (hybrid): ', round(sqrt(mean((X - X_hy)^2)), 3)))
+print(paste0('HWI RMSE: ', round(sqrt(mean((X - X_hwi)^2)), 3)))
+
+print(paste0('LSTM MAE: ', round(mean(abs(X - X_for)), 3)))
+print(paste0('LSTM MAE: ', round(mean(abs(X - X_back)), 3)))
+print(paste0('LSTM MAE: ', round(mean(abs(X - X_hy)), 3)))
+print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
+
 
 
 
