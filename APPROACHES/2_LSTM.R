@@ -261,16 +261,6 @@ fit_model <- function(X_train, Y_train, window, forecast, batch, validation_spli
 
 
 
-## EDITS:
-
-## How do we properly sort the X_test_forward and backward matrices? Makes a difference
-## when we have more than one missing region.
-
-
-
-
-
-
 
 
 ## EXAMPLE 1: Single gap
@@ -545,3 +535,35 @@ print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
 
 
 
+
+
+## Something is off with the data generator for more than one-step-ahead forecasting
+## EXAMPLE 3: Multi-step Forecast
+## ---------------------
+
+dev.off()
+set.seed(10)
+X = interpTools::simXt(N = 1000, numTrend = 0)$Xt
+X_gapped = interpTools::simulateGaps(list(X), p = 0.05, g = 10, K = 1)
+X0 = X_gapped[[1]]$p0.05$g10[[1]]
+
+plot(X, type = 'l', col = 'red'); grid()
+lines(X0, type = 'l', lwd = 2)
+
+
+## Defining parameters
+window = 25
+forecast = 10
+
+## Generating training and testing data
+data = data_generator(X0, window = window, forecast = forecast)
+
+X_train = data[[1]]
+Y_train = data[[2]]
+X_test_forward = data[[3]]
+X_test_backward = data[[4]]
+
+dim(X_train)
+dim(Y_train)
+dim(X_test_forward)
+dim(X_test_backward)
