@@ -538,7 +538,7 @@ print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
 
 
 ## Something is off with the data generator for more than one-step-ahead forecasting
-## EXAMPLE 3: Multi-step Forecast
+## EXAMPLE 3: Multi-step Forecast (the gap width)
 ## ---------------------
 
 dev.off()
