@@ -96,7 +96,3 @@ get_model <- function(Architecture, N){
     return(autoencoder)
   }
 }
-
-
-
-
