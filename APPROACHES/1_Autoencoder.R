@@ -6,13 +6,14 @@
 ## Importing libraries
 ## -----------------------
 
+library(dplyr)
 library(tsinterp)
 library(interpTools)
 library(tensorflow)
 library(keras)
 
 
-## Configuring set-up
+## Configuring set-up (not always necessary)
 ## -----------------------
 
 gpus = tf$config$experimental$list_physical_devices('GPU')
@@ -733,49 +734,49 @@ get_model <- function(Architecture, N){
   
   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
     layer_masking(mask_value = 0, input_shape = c(N), name = 'mask') %>%
-    layer_dense(units = 64, activation = 'relu', name = 'encoder1') %>%
-    layer_dense(units = 32, activation = 'relu', name = 'encoder2') %>%
-    layer_dense(units = 64, activation = 'relu', name = 'decoder1') %>%
-    layer_dense(units = N, name = 'decoder2')
+    layer_dense(units = 256, activation = 'relu', name = 'encoder1') %>%
+    layer_dense(units = 128, activation = 'relu', name = 'encoder2') %>%
+    layer_dense(units = 64, activation = 'relu', name = 'encoder3') %>%
+    layer_dense(units = 128, activation = 'relu', name = 'decoder1') %>%
+    layer_dense(units = 256, activation = 'relu', name = 'decoder2') %>%
+    layer_dense(units = N, activation = 'linear', name = 'decoder3')
   return(autoencoder)
-  # 
-  # if (Architecture == 1){
-  #   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-  #     #layer_masking(mask_value = -1, input_shape = c(N), name = 'mask') %>%
-  #     layer_masking(mask_value = 0, input_shape = c(N), name = 'mask') %>%
-  #     layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
-  #     layer_dense(units = N, activation = 'linear', name = 'decoder')
-  #   return(autoencoder)
-  # }
-  # else if(Architecture == 2){
-  #   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-  #     layer_masking(mask_value = 0, input_shape = c(N), name = 'mask') %>%
-  #     layer_dense(units = 64, activation = 'relu', name = 'encoder1') %>%
-  #     layer_dense(units = 32, activation = 'relu', name = 'encoder2') %>%
-  #     layer_dense(units = 64, activation = 'relu', name = 'decoder1') %>%
-  #     layer_dense(units = N, activation = 'linear', name = 'decoder2')
-  #   return(autoencoder)
-  # }
-  # else if(Architecture == 3){
-  #   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-  #     layer_masking(mask_value = -1, input_shape = c(N,1), name = 'mask') %>%
-  #     layer_lstm(units = 64, name = 'LSTM') %>%
-  #     layer_dense(units = 32, activation = 'relu', name = 'encoder') %>% 
-  #     layer_dense(units = N, activation = 'sigmoid', name = 'decoder')
-  #   return(autoencoder)
-  # }
-  # else if(Architecture == 4){
-  #   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-  #     layer_masking(mask_value = -1, input_shape = c(N), name = 'mask') %>%
-  #     layer_dropout(0.2, name = 'dropout')
-  #   layer_dense(units = 32, activation = 'relu', name = 'encoder') %>%
-  #     layer_dense(units = N, activation = 'sigmoid', name = 'decoder')
-  #   return(autoencoder)
-  # }
 }
 
 
-#' run_simulation
+#' simulation_main
+#' 
+#' Function which facilitates the testing of the Neural Network Imputer (NNI) versus other methods implemented in the
+#' interpTools package.
+#' @param X {list}; List object containing a complete time series (should be scaled to (0,1))
+#' @param P {list}; Proportion of missing data to be tested 
+#' @param G {list}; Gap width of missing data to be tested 
+#' @param K {integer}; Number of iterations for each P and G combination
+#' @param METHODS {list}; List of method to consider for imputation (supports 'NNI' and all others from interpTools)
+#'
+simulation_main <- function(X, P, G, K, METHODS){
+  
+  ## Setting common seed
+  set.seed(42)
+  
+  ## Impose
+  x0 = interpTools::simulateGaps(list(X), P, G, K); print('Imposed Gaps')
+  
+  ## Impute
+  xI = simulation_impute(x0, METHODS); print('Interpolated Gaps')
+  
+  ## Evaluate
+  performance = simulation_performance(X = X, xI = xI, x0 = x0)
+  
+  ## Aggregate
+  aggregation = interpTools::aggregate_pf(performance)
+  
+  ## Return
+  return(list(x0, xI, performance, aggregation))
+}
+
+
+#' simulation_run
 #' 
 #' Function to create a more organized method for running consecutive simulations. Calls the 'main' function to go through 
 #' all neural network imputer steps and then returns simulation results. Takes all the same parameters as 'main.'
@@ -786,7 +787,7 @@ get_model <- function(Architecture, N){
 #' @param Mod {float}; End point parameters for the 'runif' function when performing modulus perturbations (i.e., 1 +/- Mod)
 #' @param Arg {float}; End point parameters for the 'runif' function when performing argument perturbations (i.e., 0 +/- Arg)
 #'
-run_simulation <- function(x0, max_iter, train_size, method, Mod, Arg, Architecture){
+simulation_run <- function(x0, max_iter, train_size, method, Mod, Arg, Architecture){
   
   ## Performing imputation with Neural Network Imputer (NNI)
   x_imp = main(x0 = x0,
@@ -802,22 +803,103 @@ run_simulation <- function(x0, max_iter, train_size, method, Mod, Arg, Architect
 }
 
 
-#' my_performance
+#' simulation_impute
+#' 
+#' Function which acts as a wrapper to the interpTools interpolation process and also adds the ability to use the Neural 
+#' Network Imputer (NNI). 
+#' @param x0 {list}; List object containing an incomplete time series (should be scaled to (0,1))
+#' @param METHODS {list}; List of method to consider for imputation (supports 'NNI' and all others from interpTools)
+#'
+simulation_impute <- function(x0, METHODS){
+  
+  ## If the list contains NNI...
+  if ('NNI' %in% METHODS){
+    
+    ## Removing NNI from methods list
+    METHODS = METHODS[METHODS != 'NNI']
+    
+    ## Calling interpTools with remaining methods
+    xI_all = interpTools::parInterpolate(x0, methods = METHODS)
+    
+    ## Performing NNI imputation
+    xI_NNI = simulation_impute_NNI(x0)
+    
+    ## Joining the two results
+    xI = list(c(xI_all[[1]], xI_NNI[[1]]))
+  }
+  
+  else {
+    
+    ## Otherwise, just perform imputation with interpTools
+    xI = interpTools::parInterpolate(x0, methods = METHODS)
+  }
+  
+  ## Returning the imputed series
+  return(xI)
+}
+
+
+#' simulation_impute_NNI
+#' 
+#' Function which acts as a wrapper to the NNI interpolation process. Takes an incomplete time series as input and uses NNI
+#' to produce the interpolated series.
+#' @param x0 {list}; List object containing an incomplete time series (should be scaled to (0,1))
+#'
+simulation_impute_NNI <- function(x0){
+  
+  ## Defining helpful variables
+  D = 1
+  M = 1
+  P = length(x0[[1]])
+  G = length(x0[[1]][[1]])
+  K = length(x0[[1]][[1]][[1]])
+  numCores = detectCores()
+  
+  ## Initializing lists to store interpolated series
+  int_series = lapply(int_series <- vector(mode = 'list', M), function(x)
+    lapply(int_series <- vector(mode = 'list', P), function(x) 
+      lapply(int_series <- vector(mode = 'list', G), function(x) 
+        x <- vector(mode = 'list', K))))
+  
+  int_data = list()
+  
+  ## Setting up the function call
+  function_call = paste0("simulation_run(x, 5, 500, 'noise', 0.05, pi/6, 1)")
+  
+  ## Performing imputation
+  int_series[[M]] = lapply(x0[[D]], function(x){
+    lapply(x, function(x){
+      lapply(x, function(x){
+        eval(parse(text = function_call))})}
+    )})
+  
+  ## Applying the function name 
+  names(int_series) = c('NNI')
+  
+  ## Saving the imputed series
+  int_data[[D]] = int_series
+  
+  ## Returning the imputed series
+  return(int_data)
+}
+
+
+#' simulation_performance
 #' 
 #' Function taken directly from Sophie's implementation of the 'interpTools' package and then slightly edited. 
 #' Function to compute imputation performance with a variety of loss functions / performance metrics.
-#' @param OriginalData {list}; List object containing the original complete time series
-#' @param IntData {list}; List object containing the interpolated time series
-#' @param GappyData {list}; List object containing the original incomplete time series
+#' @param X {list}; List object containing the original complete time series
+#' @param xI {list}; List object containing the interpolated time series
+#' @param x0 {list}; List object containing the original incomplete time series
 #' @param custom {function}; Customized loss function / performance criteria if desired
 #'
-my_performance <- function(OriginalData, IntData, GappyData, custom = NULL){
+simulation_performance <- function(X, xI, x0, custom = NULL){
   
-  D <- length(IntData)
-  M <- length(IntData[[1]])
-  P <- length(IntData[[1]][[1]])
-  G <- length(IntData[[1]][[1]][[1]])
-  K <- length(IntData[[1]][[1]][[1]][[1]])
+  D <- length(xI)
+  M <- length(xI[[1]])
+  P <- length(xI[[1]][[1]])
+  G <- length(xI[[1]][[1]][[1]])
+  K <- length(xI[[1]][[1]][[1]][[1]])
   
   # Initializing nested list object
   pf <- lapply(pf <- vector(mode = 'list', D),function(x)
@@ -831,15 +913,15 @@ my_performance <- function(OriginalData, IntData, GappyData, custom = NULL){
   method_names <- numeric(M)
   data_names <- numeric(D)
   
-  prop_vec <- as.numeric(gsub("p","",names(IntData[[1]][[1]])))
-  gap_vec <- as.numeric(gsub("g","",names(IntData[[1]][[1]][[1]])))
-  method_names <- names(IntData[[1]])
+  prop_vec <- as.numeric(gsub("p","",names(xI[[1]][[1]])))
+  gap_vec <- as.numeric(gsub("g","",names(xI[[1]][[1]][[1]])))
+  method_names <- names(xI[[1]])
   
-  if(is.null(names(IntData))){
+  if(is.null(names(xI))){
     data_names <- paste0("D", 1:D)
   }
   else{
-    data_names <- names(IntData)
+    data_names <- names(xI)
   }
   
   # Evaluate the performance criteria for each sample in each (d,m,p,g) specification
@@ -855,7 +937,7 @@ my_performance <- function(OriginalData, IntData, GappyData, custom = NULL){
             ## Editing here -----------
             ## Removing the "[[d]]" from OriginalData
             ## Changing to "my_eval_performance" after changing the function names from their originals
-            pf[[d]][[m]][[p]][[g]][[k]] <- unlist(my_eval_performance(x = OriginalData, X = IntData[[d]][[m]][[p]][[g]][[k]], gappyx = GappyData[[d]][[p]][[g]][[k]], custom = custom))
+            pf[[d]][[m]][[p]][[g]][[k]] <- unlist(simulation_eval_performance(x = X, X = xI[[d]][[m]][[p]][[g]][[k]], gappyx = x0[[d]][[p]][[g]][[k]], custom = custom))
           }
           names(pf[[d]][[m]][[p]]) <- gap_vec_names
         }
@@ -879,7 +961,7 @@ my_performance <- function(OriginalData, IntData, GappyData, custom = NULL){
 }
 
 
-#' my_eval_performance
+#' simulation_eval_performance
 #' 
 #' Function taken directly from Sophie's implementation of the 'interpTools' package and then slightly edited. 
 #' Function to aggregate imputer performance over several iterations and combinations of P, G, and K and return
@@ -889,7 +971,7 @@ my_performance <- function(OriginalData, IntData, GappyData, custom = NULL){
 #' @param GappyData {list}; List object containing the original incomplete time series
 #' @param custom {function}; Customized loss function / performance criteria if desired
 #'
-my_eval_performance <- function(x, X, gappyx, custom = NULL) {
+simulation_eval_performance <- function(x, X, gappyx, custom = NULL) {
   
   # x = original , X = interpolated 
   
@@ -1066,120 +1148,7 @@ my_eval_performance <- function(x, X, gappyx, custom = NULL) {
 }
 
 
-#' FRAMEWORK
-#' 
-#' Function which facilitates the testing of the Neural Network Imputer (NNI) versus other methods implemented in the
-#' interpTools package.
-#' @param X {list}; List object containing a complete time series (should be scaled to (0,1))
-#' @param P {list}; Proportion of missing data to be tested 
-#' @param G {list}; Gap width of missing data to be tested 
-#' @param K {integer}; Number of iterations for each P and G combination
-#' @param METHODS {list}; List of method to consider for imputation (supports 'NNI' and all others from interpTools)
-#'
-FRAMEWORK <- function(X, P, G, K, METHODS){
-  
-  ## Setting common seed
-  set.seed(42)
-  
-  ## Impose
-  x0 = interpTools::simulateGaps(list(X), P, G, K); print('Imposed Gaps')
-  
-  ## Impute
-  xI = my_parInterpolate(x0, METHODS); print('Interpolated Gaps')
-  
-  ## Evaluate
-  performance = my_performance(OriginalData = X, IntData = xI, GappyData = x0)
-  
-  ## Aggregate
-  aggregation = interpTools::aggregate_pf(performance)
-  
-  ## Return
-  return(list(x0, xI, performance, aggregation))
-}
-
-
-#' my_parInterpolate
-#' 
-#' Function which acts as a wrapper to the interpTools interpolation process and also adds the ability to use the Neural 
-#' Network Imputer (NNI). 
-#' @param x0 {list}; List object containing an incomplete time series (should be scaled to (0,1))
-#' @param METHODS {list}; List of method to consider for imputation (supports 'NNI' and all others from interpTools)
-#'
-my_parInterpolate <- function(x0, METHODS){
-  
-  ## If the list contains NNI...
-  if ('NNI' %in% METHODS){
-    
-    ## Removing NNI from methods list
-    METHODS = METHODS[METHODS != 'NNI']
-    
-    ## Calling interpTools with remaining methods
-    xI_all = interpTools::parInterpolate(x0, methods = METHODS)
-    
-    ## Performing NNI imputation
-    xI_NNI = my_parInterpolate_NNI(x0)
-    
-    ## Joining the two results
-    xI = list(c(xI_all[[1]], xI_NNI[[1]]))
-  }
-  
-  else {
-    
-    ## Otherwise, just perform imputation with interpTools
-    xI = interpTools::parInterpolate(x0, methods = METHODS)
-  }
-  
-  ## Returning the imputed series
-  return(xI)
-}
-
-
-#' my_parInterpolate_NNI
-#' 
-#' Function which acts as a wrapper to the NNI interpolation process. Takes an incomplete time series as input and uses NNI
-#' to produce the interpolated series.
-#' @param x0 {list}; List object containing an incomplete time series (should be scaled to (0,1))
-#'
-my_parInterpolate_NNI <- function(x0){
-  
-  ## Defining helpful variables
-  D = 1
-  M = 1
-  P = length(x0[[1]])
-  G = length(x0[[1]][[1]])
-  K = length(x0[[1]][[1]][[1]])
-  numCores = detectCores()
-  
-  ## Initializing lists to store interpolated series
-  int_series = lapply(int_series <- vector(mode = 'list', M), function(x)
-    lapply(int_series <- vector(mode = 'list', P), function(x) 
-      lapply(int_series <- vector(mode = 'list', G), function(x) 
-        x <- vector(mode = 'list', K))))
-  
-  int_data = list()
-  
-  ## Setting up the function call
-  function_call = paste0("run_simulation(x, 5, 500, 'noise', 0.05, pi/6, 1)")
-  
-  ## Performing imputation
-  int_series[[M]] = lapply(x0[[D]], function(x){
-    lapply(x, function(x){
-      lapply(x, function(x){
-        eval(parse(text = function_call))})}
-    )})
-  
-  ## Applying the function name 
-  names(int_series) = c('NNI')
-  
-  ## Saving the imputed series
-  int_data[[D]] = int_series
-  
-  ## Returning the imputed series
-  return(int_data)
-}
-
-
-#' my_new_multiHeatmap
+#' simulation_heatmap
 #' 
 #' Function which takes an aggregations object as input and produces a multi-heatmap plot comparing 
 #' performance across all methods. The user can specify the specific metric and aggregation function
@@ -1192,8 +1161,8 @@ my_parInterpolate_NNI <- function(x0){
 #' @param title {string}; Any additional text to be added on to the end of the default title
 #' @param colors {list}; List of plot colors to be considered for the visualization
 #'
-my_new_multiHeatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', title = '', 
-                                colors = c("#F9E0AA","#F7C65B","#FAAF08","#FA812F","#FA4032","#F92111")){
+simulation_heatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', title = '', 
+                               colors = c("#F9E0AA","#F7C65B","#FAAF08","#FA812F","#FA4032","#F92111")){
   
   ## Initializing a data-frame 
   data = data.frame()
@@ -1284,123 +1253,123 @@ sim_Tt_mod <- function(N = 1000, numFreq, P){
 ## -----------------------
 
 
-## Reading the data files:
-births = read.csv('Data/daily-total-female-births.csv')
-temp = read.csv('Data/daily-max-temperatures.csv')
-sunspots = read.csv('Data/monthly-sunspots.csv')
-
-## Selecting columns of interest
-births = births$Births
-temp = temp$Temperature
-sunspots = sunspots$Sunspots
-
-## Creating sample plots of the data
-plot(births, type = 'l', lwd = 2, xlab = 'Date', ylab = 'Female Births'); grid()
-plot(temp, type = 'l', lwd = 2, xlab = 'Date', ylab = 'Temperature'); grid()
-plot(sunspots, type = 'l', lwd = 2, xlab = 'Date', ylab = 'Sunspots'); grid()
-
-## Defining experiment parameters
-P = c(0.1, 0.2, 0.3)
-G = c(10, 25, 50)
-METHODS = c('HWI', 'LI', 'NNI')
-
-
-## Births:
-births_results = FRAMEWORK(births, P, G, K = 25, METHODS)
-x0 = births_results[[1]]
-xI = births_results[[2]]
-performance = births_results[[3]]
-aggregation = births_results[[4]]
-
-births_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Births Data, N = 365)')
-births_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Births Data, N = 365)')
-births_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Births Data, N = 365)')
-
-births_heatmap_lcl
-births_heatmap_mae
-births_heatmap_rmse
-
-
-## Temperature:
-temp_results = FRAMEWORK(temp, P, G, K = 25, METHODS)
-x0 = temp_results[[1]]
-xI = temp_results[[2]]
-performance = temp_results[[3]]
-aggregation = temp_results[[4]]
-
-temp_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL')
-temp_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE')
-temp_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE')
-
-temp_heatmap_lcl
-temp_heatmap_mae
-temp_heatmap_rmse
-
-
-## Sunspots:
-sunspots_results = FRAMEWORK(sunspots, P, G, K = 25, METHODS)
-x0 = sunspots_results[[1]]
-xI = sunspots_results[[2]]
-performance = sunspots_results[[3]]
-aggregation = sunspots_results[[4]]
-
-sunspots_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Sunspots Data, N = 2820)')
-sunspots_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Sunspots Data, N = 2820)')
-sunspots_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Sunspots Data, N = 2820)')
-
-sunspots_heatmap_lcl
-sunspots_heatmap_mae
-sunspots_heatmap_rmse
-
-
-## Simple:
-set.seed(1)
-X = interpTools::simXt(N = 500, numTrend = 0, mu = 0, numFreq = 2)$Xt
-
-results = FRAMEWORK(X, P, G, K = 25, METHODS)
-x0 = results[[1]]
-xI = results[[2]]
-performance = results[[3]]
-aggregation = results[[4]]
-
-results_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Sim. Data, N = 500)')
-results_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Sim. Data, N = 500)')
-results_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Sim. Data, N = 500)')
-
-results_heatmap_lcl
-results_heatmap_mae
-results_heatmap_rmse
-
-
-## Simple (but modulated):
-set.seed(1)
-X = simTt_mod(N = 500, numFreq = 8, P = 3)$value
-
-modulated_results = FRAMEWORK(X, P, G, K = 25, METHODS)
-x0 = modulated_results[[1]]
-xI = modulated_results[[2]]
-performance = modulated_results[[3]]
-aggregation = modulated_results[[4]]
-
-results_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Sim. Modulated Data, N = 500)')
-results_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Sim. Modulated Data, N = 500)')
-results_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Sim. Modulated Data, N = 500)')
-
-results_heatmap_lcl
-results_heatmap_mae
-results_heatmap_rmse
-
-
-## Plotting some experiment results
-x_0 = x0[[1]]$p0.3$g50[[10]]
-x_i = xI[[1]]$HWI$p0.3$g50[[10]]
-x_li = xI[[1]]$LI$p0.3$g50[[10]]
-Xt_est = estimator(x_li, method = 'Xt')
-
-plot(x_i, type = 'l', col = 'red')
-lines(x_li, type = 'l', col = 'green')
-lines(Xt_est, type = 'l', col = 'dodgerblue')
-lines(sunspots, type = 'l', lwd = 2); grid()
+# ## Reading the data files:
+# births = read.csv('Data/daily-total-female-births.csv')
+# temp = read.csv('Data/daily-max-temperatures.csv')
+# sunspots = read.csv('Data/monthly-sunspots.csv')
+# 
+# ## Selecting columns of interest
+# births = births$Births
+# temp = temp$Temperature
+# sunspots = sunspots$Sunspots
+# 
+# ## Creating sample plots of the data
+# plot(births, type = 'l', lwd = 2, xlab = 'Date', ylab = 'Female Births'); grid()
+# plot(temp, type = 'l', lwd = 2, xlab = 'Date', ylab = 'Temperature'); grid()
+# plot(sunspots, type = 'l', lwd = 2, xlab = 'Date', ylab = 'Sunspots'); grid()
+# 
+# ## Defining experiment parameters
+# P = c(0.1, 0.2, 0.3)
+# G = c(10, 25, 50)
+# METHODS = c('HWI', 'LI', 'NNI')
+# 
+# 
+# ## Births:
+# births_results = FRAMEWORK(births, P, G, K = 25, METHODS)
+# x0 = births_results[[1]]
+# xI = births_results[[2]]
+# performance = births_results[[3]]
+# aggregation = births_results[[4]]
+# 
+# births_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Births Data, N = 365)')
+# births_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Births Data, N = 365)')
+# births_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Births Data, N = 365)')
+# 
+# births_heatmap_lcl
+# births_heatmap_mae
+# births_heatmap_rmse
+# 
+# 
+# ## Temperature:
+# temp_results = FRAMEWORK(temp, P, G, K = 25, METHODS)
+# x0 = temp_results[[1]]
+# xI = temp_results[[2]]
+# performance = temp_results[[3]]
+# aggregation = temp_results[[4]]
+# 
+# temp_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL')
+# temp_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE')
+# temp_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE')
+# 
+# temp_heatmap_lcl
+# temp_heatmap_mae
+# temp_heatmap_rmse
+# 
+# 
+# ## Sunspots:
+# sunspots_results = FRAMEWORK(sunspots, P, G, K = 25, METHODS)
+# x0 = sunspots_results[[1]]
+# xI = sunspots_results[[2]]
+# performance = sunspots_results[[3]]
+# aggregation = sunspots_results[[4]]
+# 
+# sunspots_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Sunspots Data, N = 2820)')
+# sunspots_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Sunspots Data, N = 2820)')
+# sunspots_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Sunspots Data, N = 2820)')
+# 
+# sunspots_heatmap_lcl
+# sunspots_heatmap_mae
+# sunspots_heatmap_rmse
+# 
+# 
+# ## Simple:
+# set.seed(1)
+# X = interpTools::simXt(N = 500, numTrend = 0, mu = 0, numFreq = 2)$Xt
+# 
+# results = FRAMEWORK(X, P, G, K = 25, METHODS)
+# x0 = results[[1]]
+# xI = results[[2]]
+# performance = results[[3]]
+# aggregation = results[[4]]
+# 
+# results_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Sim. Data, N = 500)')
+# results_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Sim. Data, N = 500)')
+# results_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Sim. Data, N = 500)')
+# 
+# results_heatmap_lcl
+# results_heatmap_mae
+# results_heatmap_rmse
+# 
+# 
+# ## Simple (but modulated):
+# set.seed(1)
+# X = simTt_mod(N = 500, numFreq = 8, P = 3)$value
+# 
+# modulated_results = FRAMEWORK(X, P, G, K = 25, METHODS)
+# x0 = modulated_results[[1]]
+# xI = modulated_results[[2]]
+# performance = modulated_results[[3]]
+# aggregation = modulated_results[[4]]
+# 
+# results_heatmap_lcl = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'LCL', title = '(Sim. Modulated Data, N = 500)')
+# results_heatmap_mae = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'MAE', title = '(Sim. Modulated Data, N = 500)')
+# results_heatmap_rmse = my_new_multiHeatmap(aggregation, P, G, METHODS, f = 'mean', crit = 'RMSE', title = '(Sim. Modulated Data, N = 500)')
+# 
+# results_heatmap_lcl
+# results_heatmap_mae
+# results_heatmap_rmse
+# 
+# 
+# ## Plotting some experiment results
+# x_0 = x0[[1]]$p0.3$g50[[10]]
+# x_i = xI[[1]]$HWI$p0.3$g50[[10]]
+# x_li = xI[[1]]$LI$p0.3$g50[[10]]
+# Xt_est = estimator(x_li, method = 'Xt')
+# 
+# plot(x_i, type = 'l', col = 'red')
+# lines(x_li, type = 'l', col = 'green')
+# lines(Xt_est, type = 'l', col = 'dodgerblue')
+# lines(sunspots, type = 'l', lwd = 2); grid()
 
 
 
