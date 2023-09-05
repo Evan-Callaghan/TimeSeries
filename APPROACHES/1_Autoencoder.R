@@ -37,7 +37,7 @@ for (gpu in gpus){
 #' @param Arg {float}; End point parameters for the 'runif' function when performing argument perturbations (i.e., 0 +/- Arg)
 #' @param Architecture {integer}; Desired neural network architecture (numerically encoded)
 #'
-main <- function(x0, max_iter, train_size, method = 'all', Mod, Arg, Architecture){
+main <- function(x0, max_iter, p, g, train_size, method = 'all', Mod, Arg){
   
   ## Defining useful variables
   N = length(x0)
@@ -46,22 +46,26 @@ main <- function(x0, max_iter, train_size, method = 'all', Mod, Arg, Architectur
   results = matrix(NA, ncol = N, nrow = max_iter)
   
   ## Building the neural network model
-  model = get_model(Architecture, N)
+  model = get_model(N)
   
   ## Step 1: Linear imputation
   xV = initialize(x0)
   
   for (i in 1:max_iter){
     
-    ## Step 2/3/4: Simulating time series and imposing gap structure
-    data = simulator(x0, xV, train_size, method, Mod, Arg)
-    inputs = data[[1]]; targets = data[[2]]; xE = data[[3]]; mean = data[[4]]
+    ## Step 2: Detecting trend and periodic components
+    components = estimator(xV)
+    Mt = components[[1]]; Tt = components[[2]]; Xt = components[[3]]
+    
+    ## Steps 3/4: Simulating time series and imposing gap structure
+    data = simulator(x0, xV, Mt, Xt, p, g, train_size, method, Mod, Arg)
+    inputs = data[[1]]; targets = data[[2]]
     
     ## Step 5: Performing the imputation
-    pred = imputer(x0 = x0 - xE - mean, inputs, targets, model)
+    pred = imputer(x0, inputs, targets, model)
     
     ## Adjusting 'pred' to include trend and mean
-    pred_adj = pred[1,] + xE + mean 
+    pred_adj = pred[1,] 
     
     ## Step 6: Extracting the predicted values and updating imputed series
     xV = ifelse(is.na(x0), pred_adj, x0); results[i,] = xV
@@ -167,16 +171,17 @@ linInt <- function(dat, blocks) {
 #' @param xV {list}; List containing the current version of imputed series ("x version")
 #' @param method {string}; Case in c('Xt', 'Mt', 'Tt')
 #' 
-estimator <- function(xV, method = 'Xt'){
+estimator <- function(xV){
   Mt = estimateMt(x = xV, N = length(xV), nw = 5, k = 8, pMax = 2) ## Estimating trend component
   Tt = estimateTt(x = xV - Mt, epsilon = 1e-6, dT = 1, nw = 5, k = 8, sigClip = 0.999) ## Estimating periodic components
   Xt = Mt ## Combining trend and periodic
   for (i in 1:dim(Tt)[2]){
     Xt = Xt + Tt[,i]
   }
-  if (method == 'Xt'){return(Xt)}
-  else if (method == 'Mt'){return(Mt)}
-  else if (method == 'Tt'){return(Tt)}
+  # if (method == 'Xt'){return(Xt)}
+  # else if (method == 'Mt'){return(Mt)}
+  # else if (method == 'Tt'){return(Tt)}
+  return(list(Mt, Tt, Xt))
 }
 
 
@@ -586,19 +591,17 @@ findPowers <- function(N,f0,Nyq,prec) {
 #' @param Mod {float}; End point parameters for the 'runif' function when performing modulus perturbations (i.e., 1 +/- Mod)
 #' @param Arg {float}; End point parameters for the 'runif' function when performing argument perturbations (i.e., 0 +/- Arg)
 #' 
-simulator <- function(x0, xV, train_size, method = 'noise', Mod, Arg){
+simulator <- function(x0, xV,  Mt, Xt, p, g, train_size, method = 'noise', Mod, Arg){
   
   ## Case 1: 
   if (method == 'noise'){
-    xE = estimator(xV, method = 'Xt') ## Estimating trend + period
-    data = simulator_noise(x0, xV, xE, train_size, Mod, Arg) ## Simulating data
+    data = simulator_noise(x0, xV, Xt, p, g, train_size, Mod, Arg) ## Simulating data
     return(data)
   }
   
   ## Case 2: 
   else if (method == 'all'){
-    Mt = estimator(xV, method = 'Mt') ## Estimating trend
-    data = simulator_all(x0, xV, Mt, train_size, Mod, Arg) ## Simulating data
+    data = simulator_all(x0, xV, Mt, p, g, train_size, Mod, Arg) ## Simulating data
     return(data)
   }
 }
@@ -614,28 +617,30 @@ simulator <- function(x0, xV, train_size, method = 'noise', Mod, Arg){
 #' @param Mod {float}; End point parameters for the 'runif' function when performing modulus perturbations (i.e., 1 +/- Mod)
 #' @param Arg {float}; End point parameters for the 'runif' function when performing argument perturbations (i.e., 0 +/- Arg)
 #' 
-simulator_noise <- function(x0, xV, xE, train_size, Mod, Arg){
-  N = length(xV) ## Defining useful parameters
+simulator_noise <- function(x0, xV, xE, p, g, train_size, Mod, Arg){
+  
+  ## Defining useful parameters
+  N = length(xV) 
+  x_g_text = paste0('interpTools::simulateGaps(list(x_p), p, g, K = 1)[[1]]$p', p, '$g', g, '[[1]]')
+  
   inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
   w = xV - xE ## Computing the residual noise
-  mean = mean(w) ## Saving the mean value
   w_f = fft(w, inverse = FALSE) ## Converting noise to frequency domain
   
-  g_index = which(is.na(x0)) ## Defining useful parameters
   for (i in 1:train_size){
+    set.seed(i) ## Setting a common seed
     w_p = w_f * complex(modulus = runif(N, 1-Mod, 1+Mod), argument = runif(N, 0-Arg, 0+Arg)) ## Creating small perturbation
     w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
     x_p = xE + w_t ## Adding perturbed noise back to trend and periodic
-    x_g = x_p; x_g[g_index] = NA ## Imposing non-randomized gap structure
+    x_g = eval(parse(text = x_g_text)); x_g[which(is.na(x0))] = 0 ## Imposing randomized gap structure
+    
     inputs_temp = c(inputs_temp, x_g) ## Appending inputs
     targets_temp = c(targets_temp, x_p) ## Appending targets
   }
   
-  inputs = array(matrix(inputs_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N)) ## Properly formatting inputs
-  targets = array(matrix(targets_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N)) ## Properly formatting targets
-  preprocessed = preprocess(inputs, targets) ## Preprocessing
-  inputs = preprocessed[[1]]; targets = preprocessed[[2]]
-  return(list(inputs, targets, xE, mean))
+  inputs = array(matrix(inputs_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N, 1)) ## Properly formatting inputs
+  targets = array(matrix(targets_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N, 1)) ## Properly formatting targets
+  return(list(inputs, targets))
 }
 
 
@@ -664,15 +669,15 @@ simulator_all <- function(x0, xV, Mt, train_size, Mod, Arg){
     Z_p = Z_f * complex(modulus = runif(N, 1-Mod, 1+Mod), argument = runif(N, 0-Arg, 0+Arg)) ## Creating small perturbation
     Z_t = as.numeric(fft(Z_p, inverse = TRUE)) / N ## Converting back to time domain
     x_p = Z_t + mean + Mt ## Adding perturbed noise back to trend and periodic
-    x_g = x_p; x_g[g_index] = NA ## Imposing non-randomized gap structure
+    x_g = x_p; x_g[g_index] = 0 ## Imposing non-randomized gap structure
     inputs_temp = c(inputs_temp, x_g) ## Appending inputs
     targets_temp = c(targets_temp, x_p) ## Appending targets
   }
   
-  inputs = array(matrix(inputs_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N)) ## Properly formatting inputs
-  targets = array(matrix(targets_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N)) ## Properly formatting targets
-  preprocessed = preprocess(inputs, targets) ## Preprocessing
-  inputs = preprocessed[[1]]; targets = preprocessed[[2]]
+  inputs = array(matrix(inputs_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N, 1)) ## Properly formatting inputs
+  targets = array(matrix(targets_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N, 1)) ## Properly formatting targets
+  #preprocessed = preprocess(inputs, targets) ## Preprocessing
+  #inputs = preprocessed[[1]]; targets = preprocessed[[2]]
   return(list(inputs, targets, Mt, mean))
 }
 
@@ -684,12 +689,12 @@ simulator_all <- function(x0, xV, Mt, train_size, Mod, Arg){
 #' @param inputs {matrix}; Matrix object containing the input training data (i.e., an incomplete time series in each row)
 #' @param targets {matrix}; Matrix object containing the target training data (i.e., a complete time series in each row)
 #' 
-preprocess <- function(inputs, targets){
-  for (i in 1:dim(inputs)[1]){
-    inputs[i,] = ifelse(is.na(inputs[i,]), 0, inputs[i,])
-  }
-  return(list(inputs, targets))
-}
+# preprocess <- function(inputs, targets){
+#   for (i in 1:dim(inputs)[1]){
+#     inputs[i,] = ifelse(is.na(inputs[i,]), 0, inputs[i,])
+#   }
+#   return(list(inputs, targets))
+# }
 
 
 #' impute
