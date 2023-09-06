@@ -621,7 +621,7 @@ simulator_noise <- function(x0, xV, xE, p, g, train_size, Mod, Arg){
   
   ## Defining useful parameters
   N = length(xV) 
-  x_g_text = paste0('interpTools::simulateGaps(list(x_p), p, g, K = 1)[[1]]$p', p, '$g', g, '[[1]]')
+  #x_g_text = paste0('interpTools::simulateGaps(list(x_p), p, g, K = 1)[[1]]$p', p, '$g', g, '[[1]]')
   
   inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
   w = xV - xE ## Computing the residual noise
@@ -629,10 +629,12 @@ simulator_noise <- function(x0, xV, xE, p, g, train_size, Mod, Arg){
   
   for (i in 1:train_size){
     set.seed(i) ## Setting a common seed
-    w_p = w_f * complex(modulus = runif(N, 1-Mod, 1+Mod), argument = runif(N, 0-Arg, 0+Arg)) ## Creating small perturbation
-    w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
-    x_p = xE + w_t ## Adding perturbed noise back to trend and periodic
-    x_g = eval(parse(text = x_g_text)); x_g[which(is.na(x_g))] = 0 ## Imposing randomized gap structure
+    #w_p = w_f * complex(modulus = runif(N, 1-Mod, 1+Mod), argument = runif(N, 0-Arg, 0+Arg)) ## Creating small perturbation
+    #w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
+    #x_p = xE + w_t ## Adding perturbed noise back to trend and periodic
+    x_p = xV
+    x_g = create_gaps(x_p, x0, p, g); x_g[which(is.na(x_g))] = 0 ## Imposing randomized gap structure
+    #x_g = eval(parse(text = x_g_text));
     
     inputs_temp = c(inputs_temp, x_g) ## Appending inputs
     targets_temp = c(targets_temp, x_p) ## Appending targets
@@ -773,9 +775,9 @@ create_gaps <- function(x, x0, p, g){
 imputer <- function(x0, inputs, targets, model){
   
   ## Defining useful parameters
-  N = dim(inputs)[2]; EPOCHS = 30; BATCH_SIZE = 32
+  N = dim(inputs)[2]; EPOCHS = 50; BATCH_SIZE = 16
   
-  x0 = as.array(matrix(ifelse(is.na(x0), 0, x0), ncol = 1, byrow = TRUE)) ## Formatting original series
+  x0 = matrix(ifelse(is.na(x0), 0, x0), ncol = 1); dim(x0) = c(1, N, 1) ## Formatting original series
   
   inputs = tf$constant(inputs) ## Creating input tensors
   targets = tf$constant(targets) ## Creating target tensors
@@ -785,11 +787,13 @@ imputer <- function(x0, inputs, targets, model){
   model %>% compile(optimizer = 'adam', loss = 'MeanSquaredError')
   
   ## Fitting the model to the training data
-  model %>% fit(inputs, targets, epochs = EPOCHS, batch_size = BATCH_SIZE, shuffle = TRUE, 
-                validation_split = 0.2, verbose = 0)
+  model %>% fit(inputs, targets, epochs = EPOCHS, batch_size = BATCH_SIZE, 
+                shuffle = FALSE, validation_split = 0.2)
   
-  preds = model %>% predict(x0, verbose = 0) ## Predicting on the original series
-  return(preds)
+  ## Predicting on the original series
+  train_preds = model %>% predict(inputs)
+  test_preds = model %>% predict(x0)
+  return(list(train_preds, test_preds))
 }
 
 
@@ -802,8 +806,8 @@ imputer <- function(x0, inputs, targets, model){
 get_model <- function(N){
   
   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-    #layer_masking(mask_value = 0, input_shape = c(N, 1), name = 'mask') %>%
-    layer_dense(units = 256, input_shape = c(N, 1), activation = 'relu', name = 'encoder1') %>%
+    layer_lstm(units = 256, input_shape = c(N, 1), return_sequences = TRUE, name = 'LSTM') %>%
+    layer_dense(units = 256, activation = 'relu', name = 'encoder1') %>%
     layer_dense(units = 128, activation = 'relu', name = 'encoder2') %>%
     layer_dense(units = 64, activation = 'relu', name = 'encoder3') %>%
     layer_dense(units = 128, activation = 'relu', name = 'decoder1') %>%
