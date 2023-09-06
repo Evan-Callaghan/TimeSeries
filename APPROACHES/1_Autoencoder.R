@@ -68,7 +68,7 @@ main <- function(x0, max_iter, p, g, train_size, method = 'all', Mod, Arg){
     pred_adj = pred[1,] 
     
     ## Step 6: Extracting the predicted values and updating imputed series
-    xV = ifelse(is.na(x0), pred_adj, x0); results[i,] = xV
+    xV = ifelse(is.na(x0), pred, x0); results[i,] = xV
     #print(paste0('Iteration ', i))
   }
   return(colMeans(results))
@@ -632,7 +632,7 @@ simulator_noise <- function(x0, xV, xE, p, g, train_size, Mod, Arg){
     w_p = w_f * complex(modulus = runif(N, 1-Mod, 1+Mod), argument = runif(N, 0-Arg, 0+Arg)) ## Creating small perturbation
     w_t = as.numeric(fft(w_p, inverse = TRUE)) / N ## Converting back to time domain
     x_p = xE + w_t ## Adding perturbed noise back to trend and periodic
-    x_g = eval(parse(text = x_g_text)); x_g[which(is.na(x0))] = 0 ## Imposing randomized gap structure
+    x_g = eval(parse(text = x_g_text)); x_g[which(is.na(x_g))] = 0 ## Imposing randomized gap structure
     
     inputs_temp = c(inputs_temp, x_g) ## Appending inputs
     targets_temp = c(targets_temp, x_p) ## Appending targets
@@ -682,6 +682,70 @@ simulator_all <- function(x0, xV, Mt, train_size, Mod, Arg){
 }
 
 
+#' create_gaps
+#' 
+#' Function taken directly from Sophie's implementation of the 'interpTools' package and then slightly edited. This function 
+#' simulates the MCAR process to impose gaps into a time series according to a set combination of missing proportion and 
+#' gap width. What differentiates this from Sophie's implementation us that the returned gapped series does not allow for gaps
+#' to be placed where the original incomplete time series (x0) has missing data. This is for specific application in the 
+#' autoencoder method for time series data imputation.
+#' @param x {list}; List containing the complete time series to be imposed with missing values (equivalent to "x version")
+#' @param x0 {list}; List containing the original incomplete time series ("x naught") 
+#' @param p {int}; Proportion of data to be removed
+#' @param g {float}; Width of missing data sections to be imposed on the series x
+#' 
+create_gaps <- function(x, x0, p, g){
+  
+  n <- length(x) ## Defining the number of data points
+  to_remove = c() ## Initializing vector to store removal indices
+  
+  ## Some checks:
+  stopifnot(is.numeric(x), is.numeric(x0), is.numeric(p), is.numeric(g), !is.null(x), !is.null(x0), !is.null(p), !is.null(g), 
+            sum(is.na(x)) == 0, g %% 1 == 0, length(x) > 2,  p >= 0 & p <= (n-2)/n, g >= 0, p*g < length(x)-2)
+  
+  ## Creating list of possible indices to remove
+  poss_values = which(!is.na(x0))
+  if (1 %in% poss_values){poss_values = poss_values[-1]}
+  if (n %in% poss_values){poss_values = poss_values[-length(poss_values)]}
+  
+  ## Determining number of data points to remove
+  if ((p * n / g) %% 1 != 0) {
+    warning(paste("Rounded to the nearest integer multiple; removed ", round(p*n/g,0)*g, " observations", sep =""))
+  }
+  
+  if((p * n / g) %% 1 <= 0.5 & (p * n / g) %% 1 != 0) {
+    end_while <- floor(p * n) - g
+  } else {
+    end_while <- floor(p * n)
+  }
+  
+  ## Deciding which indices to remove
+  num_missing <- 0
+  while(num_missing < end_while) {
+    
+    start = sample(poss_values, 1)
+    end = start + g - 1
+    
+    if (all(start:end %in% poss_values)){
+      poss_values = poss_values[!poss_values %in% start:end]
+      to_remove = c(to_remove, start:end)
+      num_missing = num_missing + g
+    }
+  }
+  
+  ## Placing NA in the indices to remove
+  x.gaps <- x
+  x.gaps[to_remove] <- NA
+  
+  ## Sanity check
+  x.gaps[1] <- x[1]
+  x.gaps[n] <- x[n]
+  
+  ## Returning the final gappy data
+  return(as.numeric(x.gaps))
+}
+
+
 #' preprocess
 #' 
 #' Function to preprocess the data before building the neural network imputer. The function fills NA values with
@@ -709,9 +773,9 @@ simulator_all <- function(x0, xV, Mt, train_size, Mod, Arg){
 imputer <- function(x0, inputs, targets, model){
   
   ## Defining useful parameters
-  N = dim(inputs)[2]; EPOCHS = 25; BATCH_SIZE = 32
+  N = dim(inputs)[2]; EPOCHS = 30; BATCH_SIZE = 32
   
-  x0 = as.array(matrix(ifelse(is.na(x0), 0, x0), nrow = 1, byrow = TRUE)) ## Formatting original series
+  x0 = as.array(matrix(ifelse(is.na(x0), 0, x0), ncol = 1, byrow = TRUE)) ## Formatting original series
   
   inputs = tf$constant(inputs) ## Creating input tensors
   targets = tf$constant(targets) ## Creating target tensors
@@ -735,16 +799,16 @@ imputer <- function(x0, inputs, targets, model){
 #' @param Architecture {integer}; Desired architecture (numerically encoded)
 #' @param N {integer}; Length of the original time series
 #' 
-get_model <- function(Architecture, N){
+get_model <- function(N){
   
   autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-    layer_masking(mask_value = 0, input_shape = c(N), name = 'mask') %>%
-    layer_dense(units = 256, activation = 'relu', name = 'encoder1') %>%
+    #layer_masking(mask_value = 0, input_shape = c(N, 1), name = 'mask') %>%
+    layer_dense(units = 256, input_shape = c(N, 1), activation = 'relu', name = 'encoder1') %>%
     layer_dense(units = 128, activation = 'relu', name = 'encoder2') %>%
     layer_dense(units = 64, activation = 'relu', name = 'encoder3') %>%
     layer_dense(units = 128, activation = 'relu', name = 'decoder1') %>%
     layer_dense(units = 256, activation = 'relu', name = 'decoder2') %>%
-    layer_dense(units = N, activation = 'linear', name = 'decoder3')
+    layer_dense(units = 1, activation = 'linear', name = 'decoder3')
   return(autoencoder)
 }
 
