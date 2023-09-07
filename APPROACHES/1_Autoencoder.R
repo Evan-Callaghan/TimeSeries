@@ -37,7 +37,7 @@ for (gpu in gpus){
 #' @param Arg {float}; End point parameters for the 'runif' function when performing argument perturbations (i.e., 0 +/- Arg)
 #' @param Architecture {integer}; Desired neural network architecture (numerically encoded)
 #'
-main <- function(x0, max_iter, p, g, train_size, method = 'all', Mod, Arg){
+main <- function(x0, max_iter, p, g, train_size, method = 'noise', Mod, Arg){
   
   ## Defining useful variables
   N = length(x0)
@@ -62,15 +62,13 @@ main <- function(x0, max_iter, p, g, train_size, method = 'all', Mod, Arg){
     inputs = data[[1]]; targets = data[[2]]
     
     ## Step 5: Performing the imputation
-    pred = imputer(x0, inputs, targets, model)
-    
-    ## Adjusting 'pred' to include trend and mean
-    pred_adj = pred[1,] 
+    preds = imputer(x0, inputs, targets, model)
     
     ## Step 6: Extracting the predicted values and updating imputed series
-    xV = ifelse(is.na(x0), pred, x0); results[i,] = xV
+    xV = ifelse(is.na(x0), preds[1,,1], x0); results[i,] = xV
     #print(paste0('Iteration ', i))
   }
+  return(results)
   return(colMeans(results))
 }
 
@@ -536,7 +534,7 @@ removePeriod <- function(xd, f0, nw, k, deltaT, warn=FALSE, prec=1e-10, sigClip)
 #' @param Nyq {?}; 
 #' @param prec {float}; Starting precision for finding a good nFFT for removal
 #' 
-findPowers <- function(N,f0,Nyq,prec) {
+findPowers <- function(N, f0, Nyq, prec) {
   nFFT <- 1e30
   
   low2 <- 0
@@ -593,6 +591,9 @@ findPowers <- function(N,f0,Nyq,prec) {
 #' 
 simulator <- function(x0, xV,  Mt, Xt, p, g, train_size, method = 'noise', Mod, Arg){
   
+  data = data_simulator(x0, xV, p, g, train_size)
+  return(data)
+  
   ## Case 1: 
   if (method == 'noise'){
     data = simulator_noise(x0, xV, Xt, p, g, train_size, Mod, Arg) ## Simulating data
@@ -605,6 +606,36 @@ simulator <- function(x0, xV,  Mt, Xt, p, g, train_size, method = 'noise', Mod, 
     return(data)
   }
 }
+
+
+#' data_simulator
+#' 
+#' Function to simulate training data for method = 'noise' (i.e., follows Method 1 described above).
+#' @param x0 {list}; List containing the original incomplete time series ("x naught") 
+#' @param xV {list}; List containing the current version of imputed series ("x version")
+#' @param p {float}; 
+#' @param g {int}; 
+#' @param train_size {integer}; Number of new time series to construct
+#' 
+data_simulator <- function(x0, xV, p, g, train_size){
+  
+  N = length(xV) ## Defining useful parameters
+  inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
+  
+  for (i in 1:train_size){
+    
+    set.seed(i) ## Setting a common seed
+    x_g = create_gaps(xV, x0, p, g); x_g[which(is.na(x_g))] = 0 ## Imposing randomized gap structure
+    
+    inputs_temp = c(inputs_temp, x_g) ## Appending inputs
+    targets_temp = c(targets_temp, xV) ## Appending targets
+  }
+  
+  inputs = array(matrix(inputs_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N, 1)) ## Properly formatting inputs
+  targets = array(matrix(targets_temp, nrow = train_size, byrow = TRUE), dim = c(train_size, N, 1)) ## Properly formatting targets
+  return(list(inputs, targets))
+}
+
 
 
 #' simulator_noise
@@ -788,12 +819,11 @@ imputer <- function(x0, inputs, targets, model){
   
   ## Fitting the model to the training data
   model %>% fit(inputs, targets, epochs = EPOCHS, batch_size = BATCH_SIZE, 
-                shuffle = FALSE, validation_split = 0.2)
+                shuffle = FALSE, validation_split = 0.2, verbose = 0)
   
   ## Predicting on the original series
-  train_preds = model %>% predict(inputs)
-  test_preds = model %>% predict(x0)
-  return(list(train_preds, test_preds))
+  preds = model %>% predict(x0, verbose = 0)
+  return(preds)
 }
 
 
