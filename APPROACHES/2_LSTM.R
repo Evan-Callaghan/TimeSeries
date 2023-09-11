@@ -388,12 +388,6 @@ print(paste0('LSTM MAE: ', round(mean(abs(X - X_hybrid)), 3)))
 print(paste0('HWI MAE: ', round(mean(abs(X - X_hwi)), 3)))
 
 
-
-
-
-
-
-
 ## EXAMPLE 2: Multiple gaps
 ## ---------------------
 
