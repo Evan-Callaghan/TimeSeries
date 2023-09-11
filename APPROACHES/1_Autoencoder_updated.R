@@ -931,9 +931,3 @@ simulation_heatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', t
 # lines(Xt_est, type = 'l', col = 'dodgerblue')
 # lines(sunspots, type = 'l', lwd = 2); grid()
 
-
-
-
-
-
-
