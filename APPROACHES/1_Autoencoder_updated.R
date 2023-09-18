@@ -1,6 +1,6 @@
-############################################
-## Approach 1: Neural Network Autoencoder ##
-############################################
+##############################################
+## Approach 1.1: Neural Network Autoencoder ##
+##############################################
 
 
 ## Importing libraries
@@ -64,12 +64,16 @@ main <- function(x0, max_iter, train_size){
     ## Step 6: Extracting the predicted values and updating imputed series
     xV = ifelse(is.na(x0), preds[1,,1], x0); results[i,] = xV
   }
-  return(colMeans(results))
+  return(xV)
 }
 
 
 #' estimate_p
 #' 
+#' Function that returns the proportion of missing data in the input series. Simply 
+#' returns the number of NA values divided by the length.
+#' @param x0 {list}; List object containing the original incomplete time series
+#'
 estimate_p <- function(x0){
   N = length(x0)
   return(round(sum(is.na(x0))/N, 2))
@@ -77,6 +81,10 @@ estimate_p <- function(x0){
 
 
 #' estimate_g
+#'
+#' Function that returns the estimated width of missing data gaps in the input series.
+#' Finds the length of all blocks of missing data and returns the mode of that list.
+#' @param x0 {list}; List object containing the original incomplete time series
 #'
 estimate_g <- function(x0){
   
@@ -208,8 +216,8 @@ linInt <- function(dat, blocks) {
 
 #' simulator
 #' 
-#' Main function for the "simulate" file. The "method" parameter determines which method is used
-#' to generate the neural network training data:
+#' Function to generate a set of training data for the network by randomly imposing 
+#' the specified gap structure into the original incomplete time series.
 #' 
 #' @param x0 {list}; List containing the original incomplete time series ("x naught") 
 #' @param xV {list}; List containing the current version of imputed series ("x version")
@@ -219,8 +227,8 @@ linInt <- function(dat, blocks) {
 #' 
 simulator <- function(x0, xV, p, g, train_size){
   
-  N = length(xV) ## Defining useful parameters
-  inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
+  N = length(xV); n_missing = N * p ## Defining useful parameters
+  inputs_temp = c(); targets_temp = c(); weights_temp = c() ## Initializing vectors to store values
   
   for (i in 1:train_size){
     
@@ -349,7 +357,7 @@ get_model <- function(N){
     layer_dense(units = 64, activation = 'relu', name = 'encoder3') %>%
     layer_dense(units = 128, activation = 'relu', name = 'decoder1') %>%
     layer_dense(units = 256, activation = 'relu', name = 'decoder2') %>%
-    layer_dense(units = 1, activation = 'linear', name = 'decoder3')
+    layer_dense(units = 1, name = 'decoder3')
   return(autoencoder)
 }
 
@@ -930,4 +938,10 @@ simulation_heatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', t
 # lines(x_li, type = 'l', col = 'green')
 # lines(Xt_est, type = 'l', col = 'dodgerblue')
 # lines(sunspots, type = 'l', lwd = 2); grid()
+
+
+
+
+
+
 
