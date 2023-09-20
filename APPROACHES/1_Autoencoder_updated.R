@@ -58,7 +58,7 @@ main <- function(x0, max_iter, train_size){
     data = simulator(x0, xV, p, g, train_size)
     inputs = data[[1]]; targets = data[[2]]
     
-    ## Step 5: Performing the imputation
+    ## Step 5: Performing imputation
     preds = imputer(x0, inputs, targets, model)
     
     ## Step 6: Extracting the predicted values and updating imputed series
