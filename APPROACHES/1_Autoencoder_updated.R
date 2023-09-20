@@ -31,8 +31,6 @@ for (gpu in gpus){
 #' Function that works through the designed algorithm and calls functions in order.
 #' @param x0 {list}; List object containing the original incomplete time series
 #' @param max_iter {integer}; Maximum number of iterations of the algorithm to perform
-#' @param p {int}; Proportion of data to be removed
-#' @param g {float}; Width of missing data sections
 #' @param train_size {integer}; Number of new time series to construct
 #'
 main <- function(x0, max_iter, train_size){
@@ -55,10 +53,10 @@ main <- function(x0, max_iter, train_size){
   for (i in 1:max_iter){
     
     ## Steps 3/4: Simulating time series and imposing gap structure
-    data = simulator(x0, xV, p, g, train_size)
+    data = simulator(x0, xV, p, g, i, train_size)
     inputs = data[[1]]; targets = data[[2]]
     
-    ## Step 5: Performing imputation
+    ## Step 5: Performing the imputation
     preds = imputer(x0, inputs, targets, model)
     
     ## Step 6: Extracting the predicted values and updating imputed series
@@ -221,18 +219,19 @@ linInt <- function(dat, blocks) {
 #' 
 #' @param x0 {list}; List containing the original incomplete time series ("x naught") 
 #' @param xV {list}; List containing the current version of imputed series ("x version")
-#' @param p {int}; Proportion of data to be removed
-#' @param g {float}; Width of missing data sections
+#' @param p {float}; Proportion of data to be removed
+#' @param g {integer}; Width of missing data sections
+#' @param iteration {integer}; Current iteration of the autoencoder algorithm
 #' @param train_size {integer}; Number of new time series to construct
 #' 
-simulator <- function(x0, xV, p, g, train_size){
+simulator <- function(x0, xV, p, g, iteration, train_size){
   
   N = length(xV); n_missing = N * p ## Defining useful parameters
   inputs_temp = c(); targets_temp = c(); weights_temp = c() ## Initializing vectors to store values
   
   for (i in 1:train_size){
     
-    set.seed(i) ## Setting a common seed
+    set.seed((iteration * train_size) + i) ## Setting a common seed
     x_g = create_gaps(xV, x0, p, g); x_g[which(is.na(x_g))] = 0 ## Imposing randomized gap structure
     
     inputs_temp = c(inputs_temp, x_g) ## Appending inputs
@@ -254,8 +253,8 @@ simulator <- function(x0, xV, p, g, train_size){
 #' autoencoder method for time series data imputation.
 #' @param x {list}; List containing the complete time series to be imposed with missing values (equivalent to "x version")
 #' @param x0 {list}; List containing the original incomplete time series ("x naught") 
-#' @param p {int}; Proportion of data to be removed
-#' @param g {float}; Width of missing data sections
+#' @param p {float}; Proportion of data to be removed
+#' @param g {integer}; Width of missing data sections
 #' 
 create_gaps <- function(x, x0, p, g){
   
@@ -345,7 +344,6 @@ imputer <- function(x0, inputs, targets, model){
 #' get_model
 #' 
 #' Function to return the desired TensorFlow neural network architecture.
-#' @param Architecture {integer}; Desired architecture (numerically encoded)
 #' @param N {integer}; Length of the original time series
 #' 
 get_model <- function(N){
@@ -812,6 +810,95 @@ simulation_heatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', t
     theme(plot.title = element_text(hjust = 0.5, size = 18)) +
     theme(strip.text = element_text(face = 'bold', size = 10))
 }
+
+
+
+
+
+
+
+
+#' plot_ts
+#' 
+#' Function to formalize the time series plotting process. Follows a standard form for which all time 
+#' series plots/visualization will be displayed in the thesis.
+#' @param x {list}; List object containing the time series to be plotted
+#' @param title {string}; Title of the plot (default is empty)
+#'
+plot_ts <- function(x, title = ''){
+  
+  X_t = data.frame(index = seq(1, length(x)), value = x)
+  
+  plt = ggplot(data = X_t, aes(x = index, y = value)) +
+    geom_line(color = "#204176") + 
+    geom_point(color = '#204176', size = 0.3) +
+    labs(title = paste0(title), x = "Index", y = "Value") +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0, face = 'bold', size = 18), 
+          axis.text = element_text(color = 'black', size = 8), 
+          axis.title.x = element_text(color = 'black', size = 12, margin = margin(t = 8)), 
+          axis.title.y = element_text(color = 'black', size = 12, margin = margin(r = 8)), 
+          panel.grid = element_line(color = 'grey', linewidth = 0.5, linetype = 'dotted'))
+  return(plt)
+}
+
+
+
+
+simulation_plot <- function(aggregation, criteria = 'RMSE', agg = 'mean', title = '', levels){
+  
+  ## Initializing data-frame to store results
+  data = data.frame()
+  
+  ## Creating structured data-frame
+  for (p in P){
+    for (g in G){
+      for (method in METHODS){
+        temp = eval(parse(text = paste0('as.data.frame(aggregation$D1$p', p, '$g', g, '$', method, ')')))
+        temp$metric = rownames(temp); rownames(temp) = NULL
+        data = rbind(data, temp)
+      }
+    }
+  }
+  
+  ## Cleaning the data-frame
+  data = data %>% dplyr::select(method, gap_width, prop_missing, metric, all_of(agg)) %>%
+    dplyr::filter(metric == criteria) %>%
+    dplyr::rename('P' = 'prop_missing', 'G' = 'gap_width', 'value' = agg) %>%
+    dplyr::arrange(desc(method))
+  
+  ## Creating colour palette
+  colors = c("#91cff2", "#85bee4", "#78add5", "#6c9dc7", "#608cb9", "#537dab", "#476d9e", "#3b5e90", "#2e4f83", "#204176")
+  col = colorRampPalette(colors = colors)(100)
+  
+  ## Creating plot
+  plt = ggplot(data, aes(as.factor(P), as.factor(G), fill = value)) +
+    geom_tile(color = '#204176', linewidth = 0.1) +
+    facet_grid(~ factor(method, levels = levels)) +
+    labs(title = paste0(title), 
+         x = "Missing Proportion (P)", 
+         y = "Gap Width (G)", 
+         fill = data$metric[1]) +
+    scale_fill_gradientn(colours = col, values = c(0,1)) + 
+    guides(fill = guide_colourbar(label = TRUE, ticks = TRUE, title = data$metric[1])) +
+    geom_text(aes(label = round(value, 3)), color = "white", size = 4) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0, face = 'bold', size = 18), 
+          strip.background = element_rect(fill = 'white'), 
+          strip.text = element_text(color = 'black', face = 'bold', size = 12), 
+          panel.spacing = unit(0.8, 'lines'), 
+          axis.text = element_text(color = 'black', size = 12), 
+          axis.title.x = element_text(color = 'black', size = 14, margin = margin(t = 8)), 
+          axis.title.y = element_text(color = 'black', size = 14, margin = margin(r = 8)), 
+          panel.grid = element_line(color = 'white'), 
+          legend.box.background = element_rect(),
+          legend.box.margin = margin(4, 4, 4, 4), 
+          legend.position = "right", 
+          legend.key.height = unit(1.5, 'cm'), 
+          legend.title.align = -0.5)
+  return(plt)
+}
+
 
 
 
