@@ -843,8 +843,16 @@ plot_ts <- function(x, title = ''){
 }
 
 
-
-
+#' simulation_plot
+#' 
+#' Function to formalize the imputation simulation plotting process. Follows a standard form for which 
+#' all time series imputation plots/visualization will be displayed in the thesis.
+#' @param aggregation {aggregation_pf}; Aggregation of imputation performance across methods
+#' @param criteria {string}; Desired criteria for imputation performance evaluation (default 'RMSE)
+#' @param agg {string}; Function type for aggregating data across K iterations (default 'mean')
+#' @param title {string}; Desired title for the returned plot
+#' @param levels {numeric}; Vector containing the method names in the desired order for the plot
+#'
 simulation_plot <- function(aggregation, criteria = 'RMSE', agg = 'mean', title = '', levels){
   
   ## Initializing data-frame to store results
