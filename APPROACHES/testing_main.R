@@ -33,17 +33,44 @@ source('APPROACHES/1_Autoencoder_updated.R')
 
 P = c(0.1, 0.2, 0.3)
 G = c(5, 10, 25)
-K = 3
-METHODS = c('LOCF', 'LI', 'KAF')
+K = 10
+METHODS = c('LOCF', 'LI', 'HWI')
 
 
 ## 1. Sunspots Data
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 set.seed(42)
-X = interpTools::simXt(N = 1000)$Xt
-plot_ts(X)
+X = interpTools::simXt(N = 500)$Xt
+X_0_1 = clean_ts(X)
+
+plot1 = plot_ts(X)
+plot2 = plot_ts(X_0_1)
+grid.arrange(plot1, plot2, nrow = 2)
+
 
 results = simulation_main(X, P, G, K, METHODS)
 
@@ -51,47 +78,83 @@ x0 = results[[1]]
 xI = results[[2]]
 performance = results[[3]]
 aggregation = results[[4]]
-
-simulation_plot(aggregation, criteria = 'RMSE', agg = 'mean', 
-                title = 'Simulation Results:', levels = c('LOCF', 'LI', 'KAF'))
+cleaned_exp = simulation_cleaner(x0, xI, P, G, K, METHODS)
 
 
-cleaned = simulation_cleaner(x0, xI, P, G, K, METHODS)
+results_0_1 = simulation_main(X_0_1, P, G, K, METHODS)
+
+x0_0_1 = results_0_1[[1]]
+xI_0_1 = results_0_1[[2]]
+performance_0_1 = results_0_1[[3]]
+aggregation_0_1 = results_0_1[[4]]
+cleaned_exp_0_1 = simulation_cleaner(x0_0_1, xI_0_1, P, G, K, METHODS)
 
 
-cleaned[[1]][1:3, 1:10]
-cleaned[[2]][1:3, 1:11]
-
-dim(cleaned[[1]])
-dim(cleaned[[2]])
-
-## output from x0: [[1]]$p0.3$g10[[3]]
-## output from xI: [[1]]$NNI$p0.3$g10[[3]]
-
-
-
+plot1 = simulation_plot(aggregation, criteria = 'RMSE', agg = 'mean', 
+                        title = 'Original Data', levels = c('LOCF', 'LI', 'HWI'))
+plot2 = simulation_plot(aggregation_0_1, criteria = 'RMSE', agg = 'mean', 
+                        title = 'Scaled Data', levels = c('LOCF', 'LI', 'HWI'))
+grid.arrange(plot1, plot2, nrow = 2)
 
 
 
-# Initializing data-frame to store results
-data = data.frame()
+no_scale = data.frame(X = X,
+                      x0 = as.numeric(cleaned_exp[[1]][42,-seq(1, 3)]), 
+                      locf = as.numeric(cleaned_exp[[2]][42,-seq(1, 4)]), 
+                      li = as.numeric(cleaned_exp[[2]][132,-seq(1, 4)]), 
+                      hwi = as.numeric(cleaned_exp[[2]][222,-seq(1, 4)]))
+scaled = data.frame(X = X_0_1,
+                    x0 = as.numeric(cleaned_exp_0_1[[1]][42,-seq(1, 3)]), 
+                    locf = as.numeric(cleaned_exp_0_1[[2]][42,-seq(1, 4)]), 
+                    li = as.numeric(cleaned_exp_0_1[[2]][132,-seq(1, 4)]), 
+                    hwi = as.numeric(cleaned_exp_0_1[[2]][222,-seq(1, 4)]))
 
-## Creating structured data-frame
-for (p in P){
-  for (g in G){
-    for (method in METHODS){
-      temp = eval(parse(text = paste0('as.data.frame(aggregation$D1$p', p, '$g', g, '$', method, ')')))
-      temp$metric = rownames(temp); rownames(temp) = NULL
-      data = rbind(data, temp)
-    }
-  }
+plot_series <- function(data){
+  plt = ggplot(data) +
+    geom_line(aes(x = index(data), y = locf, color = 'LOCF')) +
+    geom_line(aes(x = index(data), y = li, color = 'LI')) +
+    geom_line(aes(x = index(data), y = hwi, color = 'HWI')) +
+    geom_line(aes(x = index(data), y = x0, color = 'X0'), linewidth = 1.01, alpha = 0.8) +
+    labs(x = "Index", y = "Value") +
+    scale_color_manual(name = "Legend", values = c("LOCF" = "red", "LI" = "dodgerblue", 'HWI' = 'green', 'X0' = 'black')) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0, face = 'bold', size = 18), 
+          axis.text = element_text(color = 'black', size = 8), 
+          axis.title.x = element_text(color = 'black', size = 12, margin = margin(t = 8)), 
+          axis.title.y = element_text(color = 'black', size = 12, margin = margin(r = 8)), 
+          panel.grid = element_line(color = 'grey', linewidth = 0.5, linetype = 'dotted'))
+  
+  return(plt)
 }
 
-## Cleaning the data-frame
-data = data %>% dplyr::select(method, gap_width, prop_missing, metric, all_of(agg)) %>%
-  dplyr::filter(metric == criteria) %>%
-  dplyr::rename('P' = 'prop_missing', 'G' = 'gap_width', 'value' = all_of(agg)) %>%
-  dplyr::arrange(desc(method))
+plot1 = plot_series(no_scale)
+plot2 = plot_series(scaled)
+grid.arrange(plot1, plot2, nrow = 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
