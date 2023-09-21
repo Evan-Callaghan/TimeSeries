@@ -473,7 +473,7 @@ simulation_impute_NNI <- function(x0){
   int_data = list()
   
   ## Setting up the function call
-  function_call = paste0("simulation_run(x, 5, 320)")
+  function_call = paste0("simulation_run(x, 1, 320)")
   
   ## Performing imputation
   int_series[[M]] = lapply(x0[[D]], function(x){
@@ -812,12 +812,6 @@ simulation_heatmap <- function(agg, P, G, METHODS, crit = 'MAE', f = 'median', t
 }
 
 
-
-
-
-
-
-
 #' plot_ts
 #' 
 #' Function to formalize the time series plotting process. Follows a standard form for which all time 
@@ -872,7 +866,7 @@ simulation_plot <- function(aggregation, criteria = 'RMSE', agg = 'mean', title 
   ## Cleaning the data-frame
   data = data %>% dplyr::select(method, gap_width, prop_missing, metric, all_of(agg)) %>%
     dplyr::filter(metric == criteria) %>%
-    dplyr::rename('P' = 'prop_missing', 'G' = 'gap_width', 'value' = agg) %>%
+    dplyr::rename('P' = 'prop_missing', 'G' = 'gap_width', 'value' = all_of(agg)) %>%
     dplyr::arrange(desc(method))
   
   ## Creating colour palette
@@ -902,13 +896,66 @@ simulation_plot <- function(aggregation, criteria = 'RMSE', agg = 'mean', title 
           legend.box.background = element_rect(),
           legend.box.margin = margin(4, 4, 4, 4), 
           legend.position = "right", 
-          legend.key.height = unit(1.5, 'cm'), 
+          legend.key.height = unit(1, 'cm'), 
           legend.title.align = -0.5)
   return(plt)
 }
 
 
+#' simulation_cleaner
+#' 
+#' Function to store all simulation results in a consistent format. Takes in x0 and xI
+#' which are outputted from the main simulation functions and stores all information
+#' in data-frames. These will be used to save simulation results in csv or excel files
+#' so we don't lose results. 
+#' @param x0 {list}; List object containing first item returned from simulation_main
+#' @param xI {list}; List object containing second item returned from simulation_main
+#' @param P {list}; Proportion of missing data to be tested 
+#' @param G {list}; Gap width of missing data to be tested 
+#' @param K {integer}; Number of iterations for each P and G combination
+#' @param METHODS {list}; List of method to consider for imputation (supports 'NNI' and all others from interpTools)
+#'
+simulation_cleaner <- function(x0, xI, P, G, K, METHODS){
+  
+  ## Returning x0 information:
+  x0_info = data.frame(); x0_data = data.frame()
+  for (p in P){
+    for (g in G){
+      for (k in 1:K){
+        x0_info = rbind(x0_info, c(p, g, k))
+        x0_data = rbind(x0_data, eval(parse(text = paste0('as.numeric(x0[[1]]$p', p, '$g', g, '[[', k, ']])'))))
+      }
+    }
+  }
+  colnames(x0_info) = c('P', 'G', 'K')
+  colnames(x0_data) = NULL
+  x0 = cbind(x0_info, x0_data)
+  
+  
+  ## Returning xI information:
+  xI_info = data.frame(); xI_data = data.frame()
+  for (method in METHODS){
+    for (p in P){
+      for (g in G){
+        for (k in 1:K){
+          xI_info = rbind(xI_info, c(method, p, g, k))
+          xI_data = rbind(xI_data, eval(parse(text = paste0('as.numeric(xI[[1]]$', method, '$p', p, '$g', g, '[[', k, ']])'))))
+        }
+      }
+    }
+  }
+  colnames(xI_info) = c('METHOD', 'P', 'G', 'K')
+  colnames(xI_data) = NULL
+  xI = cbind(xI_info, xI_data)
+  
+  return(list(x0, xI))
+}
 
+
+
+clean_ts <- function(x){
+  return((x - min(x)) / (max(x) - min(x)))
+}
 
 
 
