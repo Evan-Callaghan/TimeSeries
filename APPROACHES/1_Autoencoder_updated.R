@@ -62,7 +62,7 @@ main <- function(x0, max_iter, train_size){
     ## Step 6: Extracting the predicted values and updating imputed series
     xV = ifelse(is.na(x0), preds[1,,1], x0); results[i,] = xV
   }
-  return(xV)
+  return(results[max_iter,])
 }
 
 
@@ -949,6 +949,42 @@ simulation_cleaner <- function(x0, xI, P, G, K, METHODS){
   xI = cbind(xI_info, xI_data)
   
   return(list(x0, xI))
+}
+
+
+#' simulation_saver
+#' 
+#' Function to store all simulation results in a consistent format. Takes the simulation performance as input
+#' and sorts through the nested lists to organize imputation performance in a data-frame object. The returned 
+#' data-frame can be easily exported to save simulation results.
+#' @param performance {list}; Nested list object containing performance evaluation from the the set of simulations
+#' @param P {list}; Proportion of missing data to be tested 
+#' @param G {list}; Gap width of missing data to be tested 
+#' @param K {integer}; Number of iterations for each P and G combination
+#' @param METHODS {list}; List of method to consider for imputation (supports 'NNI' and all others from interpTools)
+#'
+simulation_saver <- function(performance, P, G, K, METHODS){
+  
+  ## Initializing data-frame to store results
+  performance_summary = data.frame()
+  
+  ## Looping through all simulation combinations
+  for (method in METHODS){
+    for (p in P){
+      for (g in G){
+        for (k in 1:K){
+          
+          ## Appending the selected performance metrics
+          metrics = paste0("performance$D1$", method, "$p", p, "$g", g, "[[", k, "]]")
+          performance_summary = rbind(performance_summary, c(method, p, g, k, as.numeric(eval(parse(text = metrics)))))
+        }
+      }
+    }
+  }
+  ## Cleaning the final data-frame
+  colnames(performance_summary) = c('Method', 'P', 'G', 'K', 'pearson_r', 'r_squared', 'AD', 'MBE', 'ME', 'MAE', 'MRE', 'MARE',
+                                    'MAPE', 'SSE', 'MSE', 'RMS', 'NMSE', 'RE', 'RMSE', 'NRMSD', 'RMSS', 'MdAPE', 'LCL')
+  return(performance_summary)
 }
 
 
