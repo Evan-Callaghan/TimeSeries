@@ -33,7 +33,7 @@ source('APPROACHES/1_Autoencoder_updated.R')
 
 P = c(0.1, 0.2, 0.3, 0.4)
 G = c(5, 10, 25, 50)
-K = 5
+K = 2
 METHODS = c('HWI', 'LI', 'LOCF')
 
 
@@ -68,10 +68,51 @@ plot_series(sunspots_sim_data, title = 'Simulation Results: P=0.4, G=50')
 
 
 
+## RMSE, MAE, LCL,
+## mean, median, sd, iqr
+
+
+simulation_saver(sunspots_sim_aggregation)
+
+
+
+
+simulation_saver <- function(aggregation, P, G, K, METHODS){
+  
+  ## Initializing data-frame to store results
+  info = data.frame()
+  
+  ## Looping through all simulation combinations
+  for (method in METHODS){
+    for (p in P){
+      for (g in G){
+        for (k in 1:K){
+          
+          ## Appending the MAE, RMSE, and LCL performance metrics
+          text = paste0("aggregation$D1$p", p, "$g", g, "$", method, "[c('MAE','RMSE','LCL'), c('mean','median','iqr','sd')]")
+          info = rbind(info, c(method, p, g, k, unlist(text)))
+        }
+      }
+    }
+  }
+  ## Organizing the final data-frame
+  colnames(info) = c('Method', 'P', 'G', 'K', 'MAE_mean', 'RMSE_mean', 'LCL_mean', 'MAE_median', 'RMSE_median', 
+                     'LCL_median', 'MAE_iqr', 'RMSE_iqr', 'LCL_iqr', 'MAE_sd', 'RMSE_sd', 'LCL_sd')
+  return(info)
+}
+
+
 
 ## 2. Stock Price Data
 
 
+
+
+
+
+set.seed(100)
+X = interpTools::simXt(N = 500, numTrend = 0, snr = 100000)$Xt
+plot(X, type = 'l')
 
 
 
