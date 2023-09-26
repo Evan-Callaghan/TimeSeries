@@ -123,55 +123,6 @@ plot(X, type = 'l')
 
 
 
-plot_series <- function(data, title){
-  plt = ggplot(data) +
-    geom_line(aes(x = index(data), y = LOCF, color = 'LOCF')) +
-    geom_line(aes(x = index(data), y = LI, color = 'LI')) +
-    geom_line(aes(x = index(data), y = HWI, color = 'HWI')) +
-    geom_line(aes(x = index(data), y = x0, color = 'X0'), linewidth = 1.01, alpha = 0.8) +
-    labs(title = paste0(title), x = "Index", y = "Value") +
-    scale_color_manual(name = "Legend", values = c("LOCF" = "red", "LI" = "dodgerblue", 'HWI' = 'green', 'X0' = 'black')) +
-    theme_bw() +
-    theme(plot.title = element_text(hjust = 0, face = 'bold', size = 18), 
-          axis.text = element_text(color = 'black', size = 8), 
-          axis.title.x = element_text(color = 'black', size = 12, margin = margin(t = 8)), 
-          axis.title.y = element_text(color = 'black', size = 12, margin = margin(r = 8)), 
-          panel.grid = element_line(color = 'grey', linewidth = 0.5, linetype = 'dotted'))
-  
-  return(plt)
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
