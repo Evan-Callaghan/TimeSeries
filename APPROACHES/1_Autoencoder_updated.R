@@ -376,10 +376,10 @@ simulation_main <- function(X, P, G, K, METHODS){
   set.seed(42)
   
   ## Impose
-  x0 = interpTools::simulateGaps(list(X), P, G, K); print('Imposed Gaps')
+  x0 = interpTools::simulateGaps(list(X), P, G, K)
   
   ## Impute
-  xI = simulation_impute(x0, METHODS); print('Interpolated Gaps')
+  xI = simulation_impute(x0, METHODS)
   
   ## Evaluate
   performance = simulation_performance(X = X, xI = xI, x0 = x0)
@@ -824,15 +824,16 @@ plot_ts <- function(x, title = ''){
   X_t = data.frame(index = seq(1, length(x)), value = x)
   
   plt = ggplot(data = X_t, aes(x = index, y = value)) +
-    geom_line(color = "#204176") + 
-    geom_point(color = '#204176', size = 0.3) +
+    geom_line(color = "#476d9e", linewidth = 0.8) + 
+    geom_point(color = '#476d9e', size = 0.4) +
     labs(title = paste0(title), x = "Index", y = "Value") +
     theme_bw() +
-    theme(plot.title = element_text(hjust = 0, face = 'bold', size = 18), 
-          axis.text = element_text(color = 'black', size = 8), 
-          axis.title.x = element_text(color = 'black', size = 12, margin = margin(t = 8)), 
-          axis.title.y = element_text(color = 'black', size = 12, margin = margin(r = 8)), 
-          panel.grid = element_line(color = 'grey', linewidth = 0.5, linetype = 'dotted'))
+    theme(plot.title = element_text(hjust = 0.5, face = 'bold', size = 20), 
+          axis.text = element_text(color = 'black', size = 10), 
+          axis.title.x = element_text(color = 'black', size = 14, margin = margin(t = 8)), 
+          axis.title.y = element_text(color = 'black', size = 14, margin = margin(r = 8)), 
+          panel.grid = element_line(color = 'grey70', linewidth = 0.5, linetype = 'dotted'),
+          text=element_text(family="Helvetica"))
   return(plt)
 }
 
