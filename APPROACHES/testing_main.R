@@ -74,43 +74,32 @@ sunspots_sim_plot
 ## Generated time series with high SNR value
 set.seed(5000)
 X = interpTools::simXt(N = 1000, numTrend = 0, snr = 10000)$Xt
-plot_ts(X)
+plot_ts(clean_ts(X), title = 'High SNR Generated Data')
 
 
 ## Generated time series with low SNR value
 set.seed(111)
 X = interpTools::simXt(N = 1000, numTrend = 0, snr = 0.01)$Xt
-plot_ts(X)
+plot_ts(clean_ts(X), title = 'Low SNR Generated Data')
 
 ## Sunspots time series (https://www.kaggle.com/datasets/hugoherrera11/monthly-sunspots) 
 sunspots = read.csv('Data/monthly-sunspots.csv')$Sunspots
-plot_ts(sunspots)
+plot_ts(clean_ts(sunspots), title = 'Monthly Sunspots Data')
 
 
-## Room temperature time series (https://www.kaggle.com/datasets/vitthalmadane/ts-temp-1)
-temperature = read.csv('Data/MLTempDataset.csv')
-head(temperature)
-plot_ts(temperature$DAYTON_MW)
+## Daily Price of Apple stock time series (Yahoo Finance, 5YR, Daily)
+apple = read.csv('Data/AAPL.csv')
+head(apple)
+plot_ts(clean_ts(apple$Close), title = 'Apple Stock Price Data')
 
 
-## Price of gold time series (https://www.kaggle.com/datasets/arashnic/learn-time-series-forecasting-from-gold-price)
-gold = read.csv('Data/gold_price_data.csv')
-head(gold)
-plot_ts(gold$Value)
-
-
-
-
-
-
-
-
+## Frequency modulated time series
 t = 1:1000
 X_mod = 10*cos(2*pi*(0.001*t + (1/20000*t^2 - 0.05*t)))
-
 set.seed(11)
 W_t = interpTools::simWt(N = 1000, var = 20)
-plot_ts(X_mod + W_t$value)
+X = X_mod + W_t$value
+plot_ts(clean_ts(X), title = 'Frequency Modulated Generated Data')
 
 
 
@@ -156,18 +145,6 @@ sim_Tt_mod <- function(N = 1000, numFreq, P){
 
 Tt = sim_Tt_mod(N = 1000, numFreq = 1, P = 0)
 plot_ts(Tt$value)
-
-
-
-
-
-## Generating a time series with a frequency modulated signal
-t = 1:1000
-sequence = 50 * cos(2*pi*(0.03)*t + (2*pi*(1/1000*t^2 - t)))
-plot_ts(sequence)
-
-
-
 
 
 
