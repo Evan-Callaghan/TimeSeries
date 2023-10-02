@@ -40,12 +40,19 @@ METHODS = c('NN', 'LI', 'NCS', 'FMM', 'HCS', 'SI', 'KAF', 'KKSF', 'LOCF', 'NOCB'
             'LWMA', 'EWMA', 'RMEA', 'RMED', 'RMOD', 'RRND', 'HWI')
 
 
+## Reading the data sets
+## -----------------------
+
+sunspots = read.csv('.../sunspots.csv')$sunspots
+apple = read.csv('.../apple.csv')$apple
+high_snr = read.csv('.../simulated.csv')$high_snr
+low_snr = read.csv('.../simulated.csv')$low_snr
+modulated = read.csv('.../simulated.csv')$modulated
+
+
 
 ## Simulation 1: Sunspots Data
 ## -----------------------
-
-## Reading the data
-sunspots = read.csv('.../sunspots.csv')$sunspots
 
 ## Running the imputation simulation
 sunspots_sim = simulation_main(sunspots, P, G, K, METHODS)
@@ -58,9 +65,6 @@ write.csv(sunspots_sim, '.../sunspots_performance.csv', row.names = FALSE)
 ## Simulation 2: Apple Stock Data
 ## -----------------------
 
-## Reading the data
-apple = read.csv('.../apple.csv')$apple
-
 ## Running the imputation simulation
 apple_sim = simulation_main(apple, P, G, K, METHODS)
 
@@ -71,9 +75,6 @@ write.csv(apple_sim, '.../apple_performance.csv', row.names = FALSE)
 
 ## Simulation 3: High SNR Time Series
 ## -----------------------
-
-## Reading the data
-high_snr = read.csv('.../simulated.csv')$high_snr
 
 ## Running the imputation simulation
 high_snr_sim = simulation_main(high_snr, P, G, K, METHODS)
@@ -86,9 +87,6 @@ write.csv(high_snr_sim, '.../high_snr_performance.csv', row.names = FALSE)
 ## Simulation 4: Low SNR Time Series
 ## -----------------------
 
-## Reading the data
-low_snr = read.csv('.../simulated.csv')$low_snr
-
 ## Running the imputation simulation
 low_snr_sim = simulation_main(low_snr, P, G, K, METHODS)
 
@@ -99,9 +97,6 @@ write.csv(low_snr_sim, '.../low_snr_performance.csv', row.names = FALSE)
 
 ## Simulation 5: Frequency Modulated Time Series
 ## -----------------------
-
-## Reading the data
-modulated = read.csv('.../simulated.csv')$modulated
 
 ## Running the imputation simulation
 modulated_sim = simulation_main(modulated, P, G, K, METHODS)
