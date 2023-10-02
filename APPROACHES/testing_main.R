@@ -33,9 +33,14 @@ source('APPROACHES/1_Autoencoder_updated.R')
 
 P = c(0.1, 0.2, 0.3, 0.4)
 G = c(5, 10, 25, 50)
-K = 10
+K = 50
 METHODS = c('HWI', 'LI', 'LOCF')
 
+
+P = c(0.1, 0.2)
+G = c(5)
+K = 2
+METHODS = c('LI', 'NNI')
 
 
 
@@ -43,7 +48,7 @@ METHODS = c('HWI', 'LI', 'LOCF')
 ## -----------------------
 
 ## Reading and visualizing the data
-sunspots = read.csv('Data/monthly-sunspots.csv')$Sunspots
+sunspots = clean_ts(read.csv('Data/monthly-sunspots.csv')$Sunspots)
 plot_ts(sunspots)
 
 ## Running the imputation simulation
@@ -65,7 +70,7 @@ sunspots_sim_plot = simulation_plot(sunspots_sim_aggregation, criteria = 'RMSE',
 sunspots_sim_plot
 
 
-
+View(sunspots_saved)
 
 
 
@@ -105,111 +110,6 @@ plot_ts(clean_ts(X), title = 'Frequency Modulated Generated Data')
 
 
 
-
-
-
-sim_Tt_mod <- function(N = 1000, numFreq, P){
-  
-  ## Defining helpful variables
-  Tt_list <- list()
-  t = 0:(N-1)
-  fourierFreq = 2*pi/N
-  P = P + 1
-  text = ''
-  
-  for (i in 1:numFreq){
-    
-    mu = round(rnorm(1, mean = 0, sd = N/200), 3)
-    f = round(runif(1, fourierFreq, pi), 3)
-    a = round(rnorm(P, mean = 0, sd = N/200), 3)
-    
-    text = paste0(text, "(", mu, ")*cos(2*", round(pi, 3), "*(", f, "*t + ", sep = "", collapse = "")
-    
-    for (p in 1:P){
-      text = paste0(text, a[p] / (p), "*t^", p, " + ", sep = "", collapse = "")
-    }
-    
-    text = paste0(text, '0)) + ')
-  }
-  
-  text = substr(text, start = 1, stop = nchar(text) - 3)
-  
-  print(text)
-  
-  ## Returning final list object
-  Tt_list$fn <- paste(text, collapse="")  
-  Tt_list$value <- eval(parse(text = paste(text, collapse = "")))
-  return(Tt_list)
-}
-
-
-Tt = sim_Tt_mod(N = 1000, numFreq = 1, P = 0)
-plot_ts(Tt$value)
-
-
-
-
-
-
-
-
-
-N = 25
-t <- 0:(N-1)
-fourierFreq <- 2*pi/N
-
-mu <- 2
-f <- 0.5
-P <- 3
-a = c(0.1, 0.12, 0.13)
-temp = (a[1] / 2 * t^(2)) + (a[2] / 3 * t^(3)) + (a[3] / 4 * t^(4))
-X = mu * cos(2*pi*(f*t*temp))
-plot(X, type = 'l', lwd = 2); grid()
-
-a <- rnorm(P, 0, 1)
-
-temp = rep(0, N)
-for (p in 1:P){
-  temp = temp + (a[p] / (p+1) * t^(p+1))
-}
-
-to_return = mu * cos(2*pi*(f*t*temp))
-
-paste("(",b,")*sin(", w,"*t)+", sep = "", collapse = "")
-
-
-
-N = 100
-t = 0:(N-1)
-numFreq = 2
-fourierFreq = 2*pi/N
-P = 2
-text = ''
-for (i in 1:numFreq){
-  mu = rpois(1, 4)
-  
-  mu = rnorm(numFreq, mean = 0, sd = N/200)
-  f = runif(numFreq, fourierFreq, pi)
-  
-  f = round(runif(1, 0.5, 1.5), 2)
-  a = rpois(P+1, 4)
-  print(a)
-  
-  text = paste0(text, "(", mu, ")*cos(2*", pi, "*(", f, "*t + ", sep = "", collapse = "")
-  
-  for (p in 1:(P+1)){
-    
-    text = paste0(text, a[p] / (p), "*t^", p, " + ", sep = "", collapse = "")
-  }
-  
-  text = paste0(text, '0)) + ')
-}
-text = substr(text, start = 1, stop = nchar(text) - 3)
-print(text)
-
-text_fn <- paste(text, collapse = "")  
-text_value <- eval(parse(text = paste(text, collapse = "")))
-plot(text_value, type = 'l')
 
 
 
