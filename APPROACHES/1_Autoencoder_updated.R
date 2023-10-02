@@ -62,7 +62,16 @@ main <- function(x0, max_iter, train_size){
     ## Step 6: Extracting the predicted values and updating imputed series
     xV = ifelse(is.na(x0), preds[1,,1], x0); results[i,] = xV
   }
-  return(results[max_iter,])
+  
+  ## Returning a point estimation for each missing data point
+  if (maxIter == 1){
+    return(results[1,])
+  }
+  
+  ## Returning a distribution for each missing data point
+  else{
+    return(results) 
+  }
 }
 
 
@@ -232,7 +241,7 @@ simulator <- function(x0, xV, p, g, iteration, train_size){
   for (i in 1:train_size){
     
     set.seed((iteration * train_size) + i) ## Setting a common seed
-    x_g = create_gaps(xV, x0, p, g); x_g[which(is.na(x_g))] = 0 ## Imposing randomized gap structure
+    x_g = create_gaps(xV, x0, p, g) ## Imposing randomized gap structure
     
     inputs_temp = c(inputs_temp, x_g) ## Appending inputs
     targets_temp = c(targets_temp, xV) ## Appending targets
@@ -258,7 +267,7 @@ simulator <- function(x0, xV, p, g, iteration, train_size){
 #' 
 create_gaps <- function(x, x0, p, g){
   
-  n <- length(x) ## Defining the number of data points
+  n = length(x) ## Defining the number of data points
   to_remove = c() ## Initializing vector to store removal indices
   
   ## Some checks:
@@ -282,7 +291,7 @@ create_gaps <- function(x, x0, p, g){
   }
   
   ## Deciding which indices to remove
-  num_missing <- 0
+  num_missing = 0
   while(num_missing < end_while) {
     
     start = sample(poss_values, 1)
@@ -295,13 +304,13 @@ create_gaps <- function(x, x0, p, g){
     }
   }
   
-  ## Placing NA in the indices to remove
-  x.gaps <- x
-  x.gaps[to_remove] <- NA
+  ## Placing NA in the indices to remove (represented by 0)
+  x.gaps = x
+  x.gaps[to_remove] = 0
   
   ## Sanity check
-  x.gaps[1] <- x[1]
-  x.gaps[n] <- x[n]
+  x.gaps[1] = x[1]
+  x.gaps[n] = x[n]
   
   ## Returning the final gappy data
   return(as.numeric(x.gaps))
