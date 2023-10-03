@@ -37,12 +37,6 @@ K = 50
 METHODS = c('HWI', 'LI', 'LOCF')
 
 
-P = c(0.1, 0.2)
-G = c(5)
-K = 2
-METHODS = c('LI', 'NNI')
-
-
 
 ## Simulation 1: Sunspots Data
 ## -----------------------
