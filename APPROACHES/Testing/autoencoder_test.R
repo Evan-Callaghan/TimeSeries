@@ -18,8 +18,6 @@
 ## -----------------------
 
 library(dplyr)
-library(tsinterp)
-library(interpTools)
 library(tensorflow)
 library(keras)
 
