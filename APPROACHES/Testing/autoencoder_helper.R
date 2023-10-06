@@ -45,7 +45,7 @@ main <- function(x0, max_iter, train_size){
   }
   
   ## Returning a point estimation for each missing data point
-  if (maxIter == 1){
+  if (max_iter == 1){
     return(results[1,])
   }
   
@@ -407,7 +407,7 @@ simulation_impute <- function(x0){
   int_data = list()
   
   ## Setting up the function call
-  function_call = paste0("main(x, 1, 320)")
+  function_call = paste0("main(x0 = x, max_iter = 1, train_size = 320)")
   
   ## Performing imputation
   int_series[[M]] = lapply(x0[[D]], function(x){
@@ -423,7 +423,7 @@ simulation_impute <- function(x0){
   int_data[[D]] = int_series
   
   ## Returning the imputed series
-  return(int_data[[1]])
+  return(int_data)
 }
 
 

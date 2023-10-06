@@ -18,13 +18,16 @@
 ## -----------------------
 
 library(dplyr)
+library(parallel)
 library(tensorflow)
 library(keras)
+# install_tensorflow(envname = "r-tensorflow")
 
 
 ## Configuring GPU set-up
 ## -----------------------
 
+## NOTE: R Project set up to use virtual Python version
 gpus = tf$config$experimental$list_physical_devices('GPU')
 for (gpu in gpus){
   tf$config$experimental$set_memory_growth(gpu, TRUE)
@@ -47,13 +50,6 @@ K = 50
 METHODS = c('NNI')
 
 
-P = c(0.1)
-G = c(5)
-K = 2
-
-METHODS = c('NNI')
-
-
 ## Reading the data sets
 ## -----------------------
 
@@ -72,7 +68,7 @@ modulated = read.csv('Data/Cleaned/simulated.csv')$modulated
 sunspots_sim = simulation_main(sunspots, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
-write.csv(sunspots_sim, 'APPROACHES/SIMULATIONS/sunspots_performance.csv', row.names = FALSE)
+write.csv(sunspots_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_sunspots.csv', row.names = FALSE)
 
 
 
@@ -83,7 +79,7 @@ write.csv(sunspots_sim, 'APPROACHES/SIMULATIONS/sunspots_performance.csv', row.n
 apple_sim = simulation_main(apple, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
-write.csv(apple_sim, 'APPROACHES/SIMULATIONS/apple_performance.csv', row.names = FALSE)
+write.csv(apple_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_apple.csv', row.names = FALSE)
 
 
 
@@ -94,7 +90,7 @@ write.csv(apple_sim, 'APPROACHES/SIMULATIONS/apple_performance.csv', row.names =
 high_snr_sim = simulation_main(high_snr, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
-write.csv(high_snr_sim, 'APPROACHES/SIMULATIONS/high_snr_performance.csv', row.names = FALSE)
+write.csv(high_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_high_snr.csv', row.names = FALSE)
 
 
 
@@ -105,7 +101,7 @@ write.csv(high_snr_sim, 'APPROACHES/SIMULATIONS/high_snr_performance.csv', row.n
 low_snr_sim = simulation_main(low_snr, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
-write.csv(low_snr_sim, 'APPROACHES/SIMULATIONS/low_snr_performance.csv', row.names = FALSE)
+write.csv(low_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_low_snr.csv', row.names = FALSE)
 
 
 
@@ -116,8 +112,7 @@ write.csv(low_snr_sim, 'APPROACHES/SIMULATIONS/low_snr_performance.csv', row.nam
 modulated_sim = simulation_main(modulated, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
-write.csv(modulated_sim, 'APPROACHES/SIMULATIONS/modulated_performance.csv', row.names = FALSE)
-
+write.csv(modulated_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_modulated.csv', row.names = FALSE)
 
 
 

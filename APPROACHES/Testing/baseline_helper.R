@@ -16,7 +16,7 @@
 #' @param K {integer}; Number of iterations for each P and G combination
 #' @param METHODS {list}; List of method to consider for imputation (supports all methods from interpTools)
 #'
-simulation_main <- function(X, P, G, K, METHODS){
+simulation_main <- function(X, P, G, K, METHODS, numCores){
   
   ## Setting common seed
   set.seed(42)
@@ -25,7 +25,7 @@ simulation_main <- function(X, P, G, K, METHODS){
   x0 = interpTools::simulateGaps(list(X), P, G, K)
   
   ## Impute
-  xI = interpTools::parInterpolate(x0, methods = METHODS)
+  xI = interpTools::parInterpolate(x0, methods = METHODS, numCores = numCores)
   
   ## Evaluate
   performance = simulation_performance(X = X, xI = xI, x0 = x0)
