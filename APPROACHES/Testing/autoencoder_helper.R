@@ -46,6 +46,7 @@ main <- function(x0, max_iter, train_size){
   
   ## Returning a point estimation for each missing data point
   if (max_iter == 1){
+    print('Iteration Complete.')
     return(results[1,])
   }
   
@@ -273,6 +274,8 @@ create_gaps <- function(x, x0, p, g){
   
   ## Deciding which indices to remove
   num_missing = 0
+  iter_control = 0
+  
   while(num_missing < end_while) {
     
     start = sample(poss_values, 1)
@@ -282,6 +285,12 @@ create_gaps <- function(x, x0, p, g){
       poss_values = poss_values[!poss_values %in% start:end]
       to_remove = c(to_remove, start:end)
       num_missing = num_missing + g
+    }
+    
+    iter_control = iter_control + 1
+    
+    if (iter_control %% 150 == 0){
+      end_while = end_while - g
     }
   }
   
@@ -338,14 +347,17 @@ imputer <- function(x0, inputs, targets, model){
 #' 
 get_model <- function(N){
   
-  autoencoder = keras_model_sequential(name = 'Autoencoder') %>%
-    layer_lstm(units = 256, input_shape = c(N, 1), return_sequences = TRUE, name = 'LSTM') %>%
-    layer_dense(units = 256, activation = 'relu', name = 'encoder1') %>%
-    layer_dense(units = 128, activation = 'relu', name = 'encoder2') %>%
-    layer_dense(units = 64, activation = 'relu', name = 'encoder3') %>%
-    layer_dense(units = 128, activation = 'relu', name = 'decoder1') %>%
-    layer_dense(units = 256, activation = 'relu', name = 'decoder2') %>%
-    layer_dense(units = 1, name = 'decoder3')
+  layer_1 = layer_input(shape = c(N, 1), batch_shape = NULL, name = 'Input')
+  layer_2 = layer_lstm(units = 256, return_sequences = TRUE, name = 'LSTM')
+  layer_3 = layer_dense(units = 256, activation = 'relu', name = 'Encoder1')
+  layer_4 = layer_dense(units = 128, activation = 'relu', name = 'Encoder2')
+  layer_5 = layer_dense(units = 64, activation = 'relu', name = 'Connected')
+  layer_6 = layer_dense(units = 128, activation = 'relu', name = 'Decoder1')
+  layer_7 = layer_dense(units = 256, activation = 'relu', name = 'Decoder2')
+  layer_8 = layer_dense(units = 1, name = 'Output')
+  
+  autoencoder = keras_model_sequential(layers = c(layer_1, layer_2, layer_3, layer_4, 
+                                                  layer_5, layer_6, layer_7, layer_8))
   return(autoencoder)
 }
 
@@ -366,7 +378,7 @@ simulation_main <- function(X, P, G, K, METHODS){
   set.seed(42)
   
   ## Impose
-  x0 = interpTools::simulateGaps(list(X), P, G, K)
+  x0 = interpTools::simulateGaps(list(X), P, G, K); print('Imposed Gaps.')
   
   ## Impute
   xI = simulation_impute(x0)
