@@ -91,6 +91,7 @@ high_snr_sim = simulation_main(high_snr, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
 write.csv(high_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_high_snr.csv', row.names = FALSE)
+View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_high_snr.csv'))
 
 
 
