@@ -750,7 +750,7 @@ plot_ts <- function(x, title = ''){
     geom_point(color = '#476d9e', size = 0.4) +
     labs(title = paste0(title), x = "Index", y = "Value") +
     theme_bw() +
-    theme(plot.title = element_text(hjust = 0.5, face = 'bold', size = 20), 
+    theme(plot.title = element_text(hjust = 0.5, face = 'bold', size = 14), 
           axis.text = element_text(color = 'black', size = 10), 
           axis.title.x = element_text(color = 'black', size = 14, margin = margin(t = 8)), 
           axis.title.y = element_text(color = 'black', size = 14, margin = margin(r = 8)), 
@@ -770,7 +770,48 @@ plot_ts <- function(x, title = ''){
 #' @param title {string}; Desired title for the returned plot
 #' @param levels {numeric}; Vector containing the method names in the desired order for the plot
 #'
-simulation_plot <- function(aggregation, criteria = 'RMSE', agg = 'mean', title = '', levels){
+simulation_plot <- function(data, criteria, aggregation, levels, title = ''){
+  
+  # Performing the aggregation
+  grouped_results = data %>% dplyr::select(Method, P, G, all_of(criteria)) %>% 
+    dplyr::rename('value' = all_of(criteria)) %>% 
+    dplyr::group_by(Method, P, G) %>%
+    dplyr::summarise(agg_value = eval(parse(text = paste0(aggregation, '(value, na.rm = TRUE)'))))
+  
+  
+  # Creating colour palette
+  colors = c("#91cff2", "#85bee4", "#78add5", "#6c9dc7", "#608cb9", "#537dab", "#476d9e", "#3b5e90", "#2e4f83", "#204176")
+  col = colorRampPalette(colors = colors)(100)
+  
+  # Creating plot
+  plt = ggplot(grouped_results, aes(as.factor(P), as.factor(G), fill = agg_value)) +
+    geom_tile(color = '#204176', linewidth = 0.1) +
+    facet_grid(~ factor(Method, levels = levels)) +
+    labs(title = title, 
+         x = "Missing Proportion (P)", 
+         y = "Gap Width (G)", 
+         fill = criteria) +
+    scale_fill_gradientn(colours = col, values = c(0,1)) + 
+    guides(fill = guide_colourbar(label = TRUE, ticks = TRUE, title = criteria)) +
+    geom_text(aes(label = round(agg_value, 3)), color = "white", size = 4) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0, face = 'bold', size = 14), 
+          strip.background = element_rect(fill = 'white'), 
+          strip.text = element_text(color = 'black', face = 'bold', size = 12), 
+          panel.spacing = unit(0.8, 'lines'), 
+          axis.text = element_text(color = 'black', size = 12), 
+          axis.title.x = element_text(color = 'black', size = 14, margin = margin(t = 8)), 
+          axis.title.y = element_text(color = 'black', size = 14, margin = margin(r = 8)), 
+          panel.grid = element_line(color = 'white'), 
+          legend.box.background = element_rect(),
+          legend.box.margin = margin(4, 4, 4, 4), 
+          legend.position = "right", 
+          legend.key.height = unit(1, 'cm'), 
+          legend.title.align = -0.5)
+  return(plt)
+}
+
+simulation_plot_old <- function(aggregation, criteria = 'RMSE', agg = 'mean', title = '', levels){
   
   ## Initializing data-frame to store results
   data = data.frame()
