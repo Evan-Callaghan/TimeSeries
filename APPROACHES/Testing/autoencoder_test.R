@@ -113,15 +113,3 @@ modulated_sim = simulation_main(modulated, P, G, K, METHODS)
 
 ## Exporting simulation performance as a csv file
 write.csv(modulated_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_modulated.csv', row.names = FALSE)
-
-
-
-
-
-
-
-View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_sunspots.csv'))
-View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_apple.csv'))
-View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_high_snr.csv'))
-View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_low_snr.csv'))
-View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_modulated.csv'))
