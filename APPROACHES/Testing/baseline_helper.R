@@ -28,7 +28,7 @@ simulation_main <- function(X, P, G, K, METHODS, numCores){
   xI = interpTools::parInterpolate(x0, methods = METHODS, numCores = numCores)
   
   ## Evaluate
-  performance = simulation_performance(X = X, xI = xI, x0 = x0)
+  performance = simulation_performance(X, x0, xI)
   
   ## Save
   results = simulation_saver(performance, P, G, K, METHODS)
