@@ -77,8 +77,8 @@ simulation_performance <- function(X, x0, xI){
         gap_vec_names[g] = c(paste("g", gap_vec[g], sep = "")) # vector of names
         for(k in 1:K) { 
           
-          x0_temp = x0[[1]][[p]][[g]][[k]]
-          xI_temp = xI[[1]][[m]][[p]][[g]][[k]]
+          x0_temp = as.numeric(x0[[1]][[p]][[g]][[k]])
+          xI_temp = as.numeric(xI[[1]][[m]][[p]][[g]][[k]])
           
           pf[[m]][[p]][[g]][[k]] = unlist(simulation_performance_helper(X, x0_temp, xI_temp))
         }
