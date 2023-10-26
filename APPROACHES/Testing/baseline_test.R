@@ -11,7 +11,7 @@
 #*    Load all libraries with required versions. 
 #*    Import all functions from the 'testing_functions' file.
 #*    All areas with '...' are dependent on where the files are stored (adjust as needed).
-#*.  
+#* 
 
 
 ## Importing libraries
@@ -26,7 +26,7 @@ library(interpTools)
 ## Importing functions
 ## -----------------------
 
-source('.../baseline_helper.R')
+source('APPROACHES/Testing/baseline_helper.R')
 
 
 ## Simulation Parameters
@@ -45,12 +45,11 @@ numCores = 16
 ## Reading the data sets
 ## -----------------------
 
-sunspots = read.csv('.../sunspots.csv')$sunspots
-apple = read.csv('.../apple.csv')$apple
-high_snr = read.csv('.../simulated.csv')$high_snr
-low_snr = read.csv('.../simulated.csv')$low_snr
-modulated = read.csv('.../simulated.csv')$modulated
-
+sunspots = read.csv('Data/Cleaned/sunspots.csv')$sunspots
+apple = read.csv('Data/Cleaned/apple.csv')$apple
+high_snr = read.csv('Data/Cleaned/simulated.csv')$high_snr
+low_snr = read.csv('Data/Cleaned/simulated.csv')$low_snr
+modulated = read.csv('Data/Cleaned/simulated.csv')$modulated
 
 
 ## Simulation 1: Sunspots Data
@@ -60,7 +59,7 @@ modulated = read.csv('.../simulated.csv')$modulated
 sunspots_sim = simulation_main(sunspots, P, G, K, METHODS, numCores)
 
 ## Exporting simulation performance as a csv file
-write.csv(sunspots_sim, '.../SimRound1_October2023_Baseline_sunspots.csv', row.names = FALSE)
+write.csv(sunspots_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Baseline_sunspots.csv', row.names = FALSE)
 
 
 
@@ -71,7 +70,7 @@ write.csv(sunspots_sim, '.../SimRound1_October2023_Baseline_sunspots.csv', row.n
 apple_sim = simulation_main(apple, P, G, K, METHODS, numCores)
 
 ## Exporting simulation performance as a csv file
-write.csv(apple_sim, '.../SimRound1_October2023_Baseline_apple.csv', row.names = FALSE)
+write.csv(apple_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Baseline_apple.csv', row.names = FALSE)
 
 
 
@@ -82,7 +81,7 @@ write.csv(apple_sim, '.../SimRound1_October2023_Baseline_apple.csv', row.names =
 high_snr_sim = simulation_main(high_snr, P, G, K, METHODS, numCores)
 
 ## Exporting simulation performance as a csv file
-write.csv(high_snr_sim, '.../SimRound1_October2023_Baseline_high_snr.csv', row.names = FALSE)
+write.csv(high_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Baseline_high_snr.csv', row.names = FALSE)
 
 
 
@@ -93,7 +92,7 @@ write.csv(high_snr_sim, '.../SimRound1_October2023_Baseline_high_snr.csv', row.n
 low_snr_sim = simulation_main(low_snr, P, G, K, METHODS, numCores)
 
 ## Exporting simulation performance as a csv file
-write.csv(low_snr_sim, '.../SimRound1_October2023_Baseline_low_snr.csv', row.names = FALSE)
+write.csv(low_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Baseline_low_snr.csv', row.names = FALSE)
 
 
 
@@ -104,12 +103,5 @@ write.csv(low_snr_sim, '.../SimRound1_October2023_Baseline_low_snr.csv', row.nam
 modulated_sim = simulation_main(modulated, P, G, K, METHODS, numCores)
 
 ## Exporting simulation performance as a csv file
-write.csv(modulated_sim, '.../SimRound1_October2023_Baseline_modulated.csv', row.names = FALSE)
-
-
-
-
-
-
-
+write.csv(modulated_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Baseline_modulated.csv', row.names = FALSE)
 
