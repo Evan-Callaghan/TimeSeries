@@ -55,6 +55,7 @@ METHODS = c('NNI')
 
 sunspots = read.csv('Data/Cleaned/sunspots.csv')$sunspots
 apple = read.csv('Data/Cleaned/apple.csv')$apple
+temperature = read.csv('Data/Cleaned/toronto_temperature.csv')$temperature
 high_snr = read.csv('Data/Cleaned/simulated.csv')$high_snr
 low_snr = read.csv('Data/Cleaned/simulated.csv')$low_snr
 modulated = read.csv('Data/Cleaned/simulated.csv')$modulated
@@ -83,7 +84,18 @@ write.csv(apple_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_a
 
 
 
-## Simulation 3: High SNR Time Series
+## Simulation 3: Temperature Data
+## -----------------------
+
+## Running the imputation simulation
+temperature_sim = simulation_main(temperature, P, G, K, METHODS)
+
+## Exporting simulation performance as a csv file
+write.csv(temperature_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_temperature_K100.csv', row.names = FALSE)
+
+
+
+## Simulation 4: High SNR Time Series
 ## -----------------------
 
 ## Running the imputation simulation
@@ -94,7 +106,7 @@ write.csv(high_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencode
 
 
 
-## Simulation 4: Low SNR Time Series
+## Simulation 5: Low SNR Time Series
 ## -----------------------
 
 ## Running the imputation simulation
@@ -105,7 +117,7 @@ write.csv(low_snr_sim, 'APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder
 
 
 
-## Simulation 5: Frequency Modulated Time Series
+## Simulation 6: Frequency Modulated Time Series
 ## -----------------------
 
 ## Running the imputation simulation
@@ -130,7 +142,5 @@ View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_apple.cs
 View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_high_snr.csv'))
 View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_low_snr.csv'))
 View(read.csv('APPROACHES/SIMULATIONS/SimRound1_October2023_Autoencoder_modulated.csv'))
-
-
 
 
