@@ -734,7 +734,6 @@ EPOCHS = c(25, 50)
 BATCH_SIZE = c(32)
 
 tester = simulation_main(X, P, G, K, MODELS, TRAIN_SIZE, EPOCHS, BATCH_SIZE)
-
 View(tester)
 
 
