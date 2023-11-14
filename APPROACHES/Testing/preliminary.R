@@ -694,7 +694,7 @@ for (gpu in gpus){
 
 # Single Interpolation:
 
-N = 1000
+N = 1500
 X = interpTools::simXt(N)$Xt
 X0 = interpTools::simulateGaps(list(X), p = 0.1, g = 10, K = 1)[[1]]$p0.1$g10[[1]]
 
