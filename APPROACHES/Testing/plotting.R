@@ -135,9 +135,8 @@ error_distribution_facet <- function(data, metric, methods, title = ''){
 
 
 
-
-
-
+#' error_crosssection_plot
+#' 
 error_crosssection_plot <- function(data, metric, methods, title = ''){
   
   data_filtered = data %>% dplyr::filter(Method %in% methods) %>%
