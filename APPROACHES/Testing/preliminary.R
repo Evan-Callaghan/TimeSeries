@@ -25,6 +25,8 @@ main <- function(x0, max_iter, model, train_size, epochs, batch_size){
   ## Step 1: Estimating p and g
   p = estimate_p(x0); g = estimate_g(x0)
   
+  print(paste0('P:', p, '   G:', g, '   train_size:', train_size, '   epochs:', epochs, '   batch_size:', batch_size))
+  
   ## Step 2: Linear imputation
   xV = zoo::na.approx(x0)
   
@@ -43,6 +45,7 @@ main <- function(x0, max_iter, model, train_size, epochs, batch_size){
   
   ## Returning a point estimation for each missing data point
   if (max_iter == 1){
+    print('Iteration Complete.')
     return(results[1,])
   }
   
@@ -128,8 +131,8 @@ estimate_g <- function(x0){
 #' 
 simulator <- function(x0, xV, p, g, iteration, train_size){
   
-  N = length(xV); n_missing = N * p ## Defining useful parameters
-  inputs_temp = c(); targets_temp = c(); weights_temp = c() ## Initializing vectors to store values
+  N = length(xV) ## Defining useful parameters
+  inputs_temp = c(); targets_temp = c() ## Initializing vectors to store values
   
   for (i in 1:train_size){
     
@@ -160,30 +163,25 @@ simulator <- function(x0, xV, p, g, iteration, train_size){
 #' 
 create_gaps <- function(x, x0, p, g){
   
-  n = length(x) ## Defining the number of data points
-  to_remove = c() ## Initializing vector to store removal indices
+  n = length(x) # Defining the number of data points
+  to_remove = c() # Initializing vector to store removal indices
   
-  ## Some checks:
-  stopifnot(is.numeric(x), is.numeric(x0), is.numeric(p), is.numeric(g), !is.null(x), !is.null(x0), !is.null(p), !is.null(g), 
-            sum(is.na(x)) == 0, g %% 1 == 0, length(x) > 2,  p >= 0 & p <= (n-2)/n, g >= 0, p*g < length(x)-2)
+  # Some checks:
+  #stopifnot(is.numeric(x), is.numeric(x0), is.numeric(p), is.numeric(g), !is.null(x), !is.null(x0), !is.null(p), !is.null(g), sum(is.na(x)) == 0, g %% 1 == 0, length(x) > 2,  p >= 0 & p <= (n-2)/n, g >= 0, p*g < length(x)-2)
   
-  ## Creating list of possible indices to remove
+  # Creating list of possible indices to remove
   poss_values = which(!is.na(x0))
   if (1 %in% poss_values){poss_values = poss_values[-1]}
   if (n %in% poss_values){poss_values = poss_values[-length(poss_values)]}
   
-  ## Determining number of data points to remove
-  if ((p * n / g) %% 1 != 0) {
-    warning(paste("Rounded to the nearest integer multiple; removed ", round(p*n/g,0)*g, " observations", sep =""))
-  }
-  
+  # Determining number of data points to remove
   if((p * n / g) %% 1 <= 0.5 & (p * n / g) %% 1 != 0) {
     end_while <- floor(p * n) - g
   } else {
     end_while <- floor(p * n)
   }
   
-  ## Deciding which indices to remove
+  # Deciding which indices to remove
   num_missing = 0
   iter_control = 0
   
@@ -205,16 +203,16 @@ create_gaps <- function(x, x0, p, g){
     }
   }
   
-  ## Placing NA in the indices to remove (represented by 0)
-  x.gaps = x
-  x.gaps[to_remove] = 0
+  # Placing NA in the indices to remove (represented by 0)
+  to_return = x
+  to_return[to_remove] = 0
   
-  ## Sanity check
-  x.gaps[1] = x[1]
-  x.gaps[n] = x[n]
+  # Sanity check
+  to_return[1] = x[1]
+  to_return[n] = x[n]
   
-  ## Returning the final gappy data
-  return(as.numeric(x.gaps))
+  # Returning the final time series
+  return(as.numeric(to_return))
 }
 
 
@@ -239,15 +237,24 @@ imputer <- function(x0, inputs, targets, model, epochs, batch_size){
   targets = tf$constant(targets) # Creating target tensors
   x0 = tf$constant(x0) # Creating prediction tensor
   
+  # Clearing session memory
+  tf$keras$backend$clear_session()
+  
+  # Creating the model
+  autoencoder = clone_model(model)
+  
   # Compiling the model
-  #model %>% compile(optimizer = 'adam', loss = 'MeanSquaredError')
+  autoencoder %>% compile(optimizer = 'adam', loss = 'MeanSquaredError')
+  
+  # Creating early stopping callbacks
+  callbacks = tf$keras$callbacks$EarlyStopping(patience = 5)
   
   # Fitting the model to the training data
-  model %>% fit(inputs, targets, epochs = epochs, batch_size = batch_size, 
-                shuffle = FALSE, validation_split = 0.2, verbose = 0)
+  autoencoder %>% fit(inputs, targets, epochs = epochs, batch_size = batch_size, shuffle = FALSE, 
+                      validation_split = 0.2, callbacks = list(callbacks), verbose = 2)
   
   # Predicting on the original series
-  preds = model %>% predict(x0, verbose = 0)
+  preds = autoencoder %>% predict(x0, verbose = 0)
   return(preds)
 }
 
@@ -257,19 +264,36 @@ imputer <- function(x0, inputs, targets, model, epochs, batch_size){
 #' Function to return the desired TensorFlow neural network architecture.
 #' @param N {integer}; Length of the original time series
 #' 
-get_model <- function(N){
+get_model <- function(N, model){
   
-  layer_1 = layer_input(shape = c(N, 1), batch_shape = NULL, name = 'Input')
-  layer_2 = layer_lstm(units = 128, return_sequences = TRUE, name = 'LSTM')
-  layer_3 = layer_dense(units = 128, activation = 'relu', name = 'Encoder1')
-  layer_4 = layer_dense(units = 64, activation = 'relu', name = 'Encoder2')
-  layer_5 = layer_dense(units = 32, activation = 'relu', name = 'Connected')
-  layer_6 = layer_dense(units = 64, activation = 'relu', name = 'Decoder1')
-  layer_7 = layer_dense(units = 128, activation = 'relu', name = 'Decoder2')
-  layer_8 = layer_dense(units = 1, name = 'Output')
+  if (model == 'model1'){
+    layer_1 = layer_input(shape = c(N, 1), batch_shape = NULL, name = 'Input')
+    layer_2 = layer_lstm(units = 128, return_sequences = TRUE, name = 'LSTM')
+    layer_3 = layer_dense(units = 128, activation = 'relu', name = 'Encoder1')
+    layer_4 = layer_dense(units = 64, activation = 'relu', name = 'Encoder2')
+    layer_5 = layer_dense(units = 32, activation = 'relu', name = 'Connected')
+    layer_6 = layer_dense(units = 64, activation = 'relu', name = 'Decoder1')
+    layer_7 = layer_dense(units = 128, activation = 'relu', name = 'Decoder2')
+    layer_8 = layer_dense(units = 1, name = 'Output')
+    
+    autoencoder = keras_model_sequential(layers = c(layer_1, layer_2, layer_3, layer_4, 
+                                                    layer_5, layer_6, layer_7, layer_8))
+  }
   
-  autoencoder = keras_model_sequential(layers = c(layer_1, layer_2, layer_3, layer_4, 
-                                                  layer_5, layer_6, layer_7, layer_8))
+  else if (model == 'model2'){
+    layer_1 = layer_input(shape = c(N, 1), batch_shape = NULL, name = 'Input')
+    layer_2 = layer_lstm(units = 64, return_sequences = TRUE, name = 'LSTM')
+    layer_3 = layer_dense(units = 64, activation = 'relu', name = 'Encoder1')
+    layer_4 = layer_dense(units = 32, activation = 'relu', name = 'Encoder2')
+    layer_5 = layer_dense(units = 16, activation = 'relu', name = 'Connected')
+    layer_6 = layer_dense(units = 32, activation = 'relu', name = 'Decoder1')
+    layer_7 = layer_dense(units = 64, activation = 'relu', name = 'Decoder2')
+    layer_8 = layer_dense(units = 1, name = 'Output')
+    
+    autoencoder = keras_model_sequential(layers = c(layer_1, layer_2, layer_3, layer_4, 
+                                                    layer_5, layer_6, layer_7, layer_8))
+  }
+  
   return(autoencoder)
 }
 
@@ -319,8 +343,9 @@ create_model <- function(N, units, connected_units, activation){
   output = layer_dense(units = 1, name = 'Output')
   
   # Forming and compiling the final model
-  model = keras_model_sequential(layers = c(input, lstm, layers, output), name = 'Autoencoder') %>% 
-    compile(optimizer = 'adam', loss = 'MeanSquaredError')
+  model = keras_model_sequential(layers = c(input, lstm, layers, output), name = 'Autoencoder') 
+  
+  #%>% compile(optimizer = 'adam', loss = 'MeanSquaredError')
   
   return(model)
 }
@@ -694,23 +719,21 @@ for (gpu in gpus){
 
 # Single Interpolation:
 
-N = 1500
+N = 1000
 X = interpTools::simXt(N)$Xt
 X0 = interpTools::simulateGaps(list(X), p = 0.1, g = 10, K = 1)[[1]]$p0.1$g10[[1]]
 
-
 model = create_model(N, units = 128, connected_units = 32, activation = 'relu')
 
-int1 = main(X0, max_iter = 1, train_size = 320, model = model, epochs = 25, batch_size = 32)
+interpolation = main(X0, max_iter = 1, model = model, train_size = 1280, epochs = 25, batch_size = 32)
 
-int2 = main(X0, max_iter = 1, train_size = 2560, model = model, epochs = 100, batch_size = 32)
-
+interpolation2 = main(X0, max_iter = 1, model = model, train_size = 1280, epochs = 25, batch_size = 32)
 
 par(mfrow = c(2, 1), mai = c(0.5, 1, 0.5, 1))
-plot(int1, type = 'l', col = 'green', main = 'Train Size = 320, Epochs = 25'); grid()
+plot(interpolation, type = 'l', col = 'green', main = 'Train Size = 320, Epochs = 25'); grid()
 lines(X0, lwd = 1.2)
 
-plot(int2, type = 'l', col = 'red', main = 'Train Size = 2560, Epochs = 100'); grid()
+plot(interpolation2, type = 'l', col = 'red', main = 'Train Size = 2560, Epochs = 100'); grid()
 lines(X0, lwd = 1.2)
 
 
@@ -725,20 +748,21 @@ P = c(0.1, 0.2)
 G = c(10)
 K = 3
 
-model1 = create_model(N = 1000, units = 256, connected_units = 32, 'relu')
+model1 = create_model(N = 1000, units = 64, connected_units = 16, 'relu')
 model2 = create_model(N = 1000, units = 128, connected_units = 32, 'relu')
 
 MODELS = c(model1, model2)
-TRAIN_SIZE = c(640)
+TRAIN_SIZE = c(320)
 EPOCHS = c(25, 50)
 BATCH_SIZE = c(32)
 
 tester = simulation_main(X, P, G, K, MODELS, TRAIN_SIZE, EPOCHS, BATCH_SIZE)
+
 View(tester)
 
 
 
-
-
-
+model1 = c(1000, 128, 32, 'relu')
+model2 = c(1000, 64, 16, 'relu')
+list(model1, model2)
 
