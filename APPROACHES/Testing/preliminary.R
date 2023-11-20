@@ -432,8 +432,8 @@ simulation_impute <- function(x0, MODELS, TRAIN_SIZE, EPOCHS, BATCH_SIZE){
             lapply(x, function(x){
               lapply(x, function(x){
                 eval(parse(text = function_call))})})})
-          
         }
+        gc(verbose = TRUE)
         names(samples) <- batchsize_names
         batchsizeList[[e]] <- samples
       }
@@ -757,6 +757,9 @@ EPOCHS = c(25, 50)
 BATCH_SIZE = c(32)
 
 tester = simulation_main(X, P, G, K, MODELS, TRAIN_SIZE, EPOCHS, BATCH_SIZE)
+
+tester[[1]]
+tester[[2]][[1]]
 
 View(tester)
 
