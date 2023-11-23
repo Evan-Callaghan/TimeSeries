@@ -21,14 +21,16 @@ library(interpTools)
 # install_tensorflow(envname = "r-tensorflow")
 
 
+
+
 ## Configuring GPU set-up
 ## -----------------------
 
 ## NOTE: R Project set up to use virtual Python version
 gpus = tf$config$experimental$list_physical_devices('GPU')
-# for (gpu in gpus){
-#   tf$config$experimental$set_memory_growth(gpu, TRUE)
-# }
+for (gpu in gpus){
+  tf$config$experimental$set_memory_growth(gpu, TRUE)
+}
 
 
 # tf.debugging.set_log_device_placement(True)
