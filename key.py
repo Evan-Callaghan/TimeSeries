@@ -413,7 +413,37 @@ batch_size = [16, 32, 64]
 
 interp = simulation(sunspots, sunspots0, models, train_size, batch_size)
 
-interp.head()
+View(interp)
 
 interp.to_csv('Data/Prelim_Autoencoder_November2023_sunspots.csv', index = False)
 
+
+# 2. Apple Data
+
+apple = pd.read_csv('Data/Exported/apple_data.csv')
+apple0 = pd.read_csv('Data/Exported/apple_data0.csv')
+
+apple.head()
+apple0.head()
+
+interp = main(apple0['0.3_25_1'], 1, 2, 640, 32)
+
+fig = plt.figure(figsize = (12,4))
+plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
+plt.plot(apple['data'], color = 'green', linewidth = 0.7, label = 'Original')
+plt.plot(apple0['0.3_25_1'], color = 'black', label = 'Missing')
+plt.legend(fontsize = 6, loc = 'upper right')
+plt.grid()
+plt.show()
+
+simulation_perf(np.array(apple['data']), np.array(apple0['0.3_25_1']), np.array(interp))
+
+models = [1, 2]
+train_size = [320, 640, 1280]
+batch_size = [16, 32, 64]
+
+interp = simulation(apple, apple0, models, train_size, batch_size)
+
+View(interp)
+
+interp.to_csv('Data/Prelim_Autoencoder_November2023_apple.csv', index = False)
