@@ -34,7 +34,7 @@ def main(x0, max_iter, model_id, train_size, batch_size):
         inputs = data[0]; targets = data[1]
         
         # Step 5: Performing the imputation
-        preds = imputer2(x0, inputs, targets, model_id, batch_size)
+        preds = imputer(x0, inputs, targets, model_id, batch_size)
         
         # Step 6: Extracting the predicted values and updating imputed series
         xV = np.where(np.isnan(x0), preds, x0); results[i,:] = xV
@@ -227,53 +227,14 @@ def generate_model(N, model_id):
 
 def imputer(x0, inputs, targets, model_id, batch_size):
     
-    N = np.shape(inputs)[1]
-    
-    x0 = np.where(np.isnan(x0), 0, x0).reshape(1, N, 1)
-    
-    inputs = tf.constant(inputs)
-    targets = tf.constant(targets)
-    x0 = tf.constant(x0)
-
-    model = generate_model(N, model_id)
-    model.compile(loss = 'MeanSquaredError', optimizer = 'adam')
-        
-    callbacks = tf.keras.callbacks.EarlyStopping(patience = 5)
-    
-    model.fit(inputs, targets, epochs = epochs, batch_size = batch_size, shuffle = True, 
-              validation_split = 0.2, callbacks = [callbacks], verbose = 0)
-    
-    preds = model.predict(x0, verbose = 0)
-    
-    return preds[0,:,0]
-
-def imputer2(x0, inputs, targets, model_id, batch_size):
-    
-    # Creating the distribution strategy
-    # strategy = tf.distribute.MirroredStrategy(devices = ["/gpu:0", "/gpu:1", "/gpu:2", "/gpu:3"])
-    #strategy = tf.distribute.MirroredStrategy(devices = ["/gpu:0", "/gpu:1"])
-    #print('Total Devices:', strategy.num_replicas_in_sync)
-    
-    # Defining EarlyStopping calback
-    callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', patience = 5, restore_best_weights = 'True')
-    
     # Formatting
     N = np.shape(inputs)[1]
     x0 = tf.constant(np.where(np.isnan(x0), 0, x0).reshape(1, N, 1))
     inputs = tf.constant(inputs)
     targets = tf.constant(targets)
     
-    # with strategy.scope():
-    #     
-    #     # Creating the model
-    #     model = generate_model(N, model_id)
-    #     
-    #     # Compiling the model
-    #     model.compile(loss = 'MeanSquaredError', optimizer = 'adam')
-    #     
-    #     # Fitting the model
-    #     model.fit(inputs, targets, epochs = 100, batch_size = batch_size*strategy.num_replicas_in_sync, shuffle = True, validation_split = 0.2, callbacks = [callbacks], verbose = 1)
-    # 
+    # Defining EarlyStopping calback
+    callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', patience = 5, restore_best_weights = 'True')
     
     # Creating the model
     model = generate_model(N, model_id)
@@ -282,12 +243,11 @@ def imputer2(x0, inputs, targets, model_id, batch_size):
     model.compile(loss = 'MeanSquaredError', optimizer = 'adam')
     
     # Fitting the model
-    # batch_size = batch_size*strategy.num_replicas_in_sync
     model.fit(inputs, targets, epochs = 100, batch_size = batch_size, shuffle = True, validation_split = 0.2, callbacks = [callbacks], verbose = 1)
     
     # Predicting on the original time series
     preds = model.predict(x0, verbose = 1)
-    
+
     # Clearing the backend
     tf.keras.backend.clear_session()
     
@@ -417,33 +377,97 @@ View(interp)
 
 interp.to_csv('Data/Prelim_Autoencoder_November2023_sunspots.csv', index = False)
 
+# Completed in ~24 hours occupying ~74 GB of RAM
 
-# 2. Apple Data
 
-apple = pd.read_csv('Data/Exported/apple_data.csv')
-apple0 = pd.read_csv('Data/Exported/apple_data0.csv')
+# # 2. Apple Data
+# 
+# apple = pd.read_csv('Data/Exported/apple_data.csv')
+# apple0 = pd.read_csv('Data/Exported/apple_data0.csv')
+# 
+# apple.head()
+# apple0.head()
+# 
+# interp = main(apple0['0.3_25_1'], 1, 2, 640, 32)
+# 
+# fig = plt.figure(figsize = (12,4))
+# plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
+# plt.plot(apple['data'], color = 'green', linewidth = 0.7, label = 'Original')
+# plt.plot(apple0['0.3_25_1'], color = 'black', label = 'Missing')
+# plt.legend(fontsize = 6, loc = 'upper right')
+# plt.grid()
+# plt.show()
+# 
+# simulation_perf(np.array(apple['data']), np.array(apple0['0.3_25_1']), np.array(interp))
+# 
+# models = [1, 2]
+# train_size = [320, 640, 1280]
+# batch_size = [16, 32, 64]
+# 
+# interp = simulation(apple, apple0, models, train_size, batch_size)
+# 
+# interp.head()
+# 
+# interp.to_csv('Data/Prelim_Autoencoder_November2023_apple.csv', index = False)
 
-apple.head()
-apple0.head()
 
-interp = main(apple0['0.3_25_1'], 1, 2, 640, 32)
+# # 3. Temperature Data
+# 
+# temperature = pd.read_csv('Data/Exported/temperature_data.csv')
+# temperature0 = pd.read_csv('Data/Exported/temperature_data0.csv')
+# 
+# temperature.head()
+# temperature0.head()
+# 
+# interp = main(temperature0['0.3_25_1'], 1, 2, 640, 32)
+# 
+# fig = plt.figure(figsize = (12,4))
+# plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
+# plt.plot(temperature['data'], color = 'green', linewidth = 0.7, label = 'Original')
+# plt.plot(temperature0['0.3_25_1'], color = 'black', label = 'Missing')
+# plt.legend(fontsize = 6, loc = 'upper right')
+# plt.grid()
+# plt.show()
+# 
+# simulation_perf(np.array(temperature['data']), np.array(temperature0['0.3_25_1']), np.array(interp))
+# 
+# models = [1, 2]
+# train_size = [320, 640, 1280]
+# batch_size = [16, 32, 64]
+# 
+# interp = simulation(temperature, temperature0, models, train_size, batch_size)
+# 
+# interp.head()
+# 
+# interp.to_csv('Data/Prelim_Autoencoder_November2023_temperature.csv', index = False)
+
+
+# 4. High SNR Data
+
+high_snr = pd.read_csv('Data/Exported/high_snr_data.csv')
+high_snr0 = pd.read_csv('Data/Exported/high_snr_data0.csv')
+
+high_snr.head()
+high_snr0.head()
+
+interp = main(high_snr0['0.3_25_1'], 1, 2, 640, 32)
 
 fig = plt.figure(figsize = (12,4))
-plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
-plt.plot(apple['data'], color = 'green', linewidth = 0.7, label = 'Original')
-plt.plot(apple0['0.3_25_1'], color = 'black', label = 'Missing')
+plt.plot(interp, color = 'red', linewidth = 0.3, label = 'Interpolation')
+plt.plot(high_snr['data'], color = 'green', linewidth = 0.3, label = 'Original')
+plt.plot(high_snr0['0.3_25_1'], color = 'black', label = 'Missing')
 plt.legend(fontsize = 6, loc = 'upper right')
 plt.grid()
 plt.show()
 
-simulation_perf(np.array(apple['data']), np.array(apple0['0.3_25_1']), np.array(interp))
+simulation_perf(np.array(high_snr['data']), np.array(high_snr0['0.3_25_1']), np.array(interp))
 
 models = [1, 2]
 train_size = [320, 640, 1280]
 batch_size = [16, 32, 64]
 
-interp = simulation(apple, apple0, models, train_size, batch_size)
+interp = simulation(high_snr, high_snr0, models, train_size, batch_size)
 
-View(interp)
+interp.head()
 
-interp.to_csv('Data/Prelim_Autoencoder_November2023_apple.csv', index = False)
+interp.to_csv('Data/Prelim_Autoencoder_November2023_high_snr.csv', index = False)
