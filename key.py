@@ -331,21 +331,6 @@ def simulation_save(performance, X0, model, train_size, batch_size):
 
 # Performing Simulations:
 
-# 0. Initial Test
-
-data = pd.read_csv('Data/Exported/sunspots_data.csv')
-data0 = data['data'].copy(); data0[np.arange(335, 385)] = np.nan
-
-interp = main(data0, 1, 2, 1280, 32)
-
-fig = plt.figure(figsize = (8,4))
-plt.plot(interp, color = 'red', linewidth = 0.5)
-plt.plot(data0, color = 'black', linewidth = 0.75)
-plt.yticks(fontsize = 6)
-plt.xticks(fontsize = 6)
-plt.grid()
-plt.show()
-
 
 # 1. Sunspots Data
 
