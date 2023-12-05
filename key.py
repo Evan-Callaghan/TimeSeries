@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore")
 
 
 # Defining "Autoencoder" Functions: 
+## -----------------------
 
 def main(x0, max_iter, model_id, train_size, batch_size):
     
@@ -234,7 +235,7 @@ def imputer(x0, inputs, targets, model_id, batch_size):
     targets = tf.constant(targets)
     
     # Defining EarlyStopping calback
-    callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', patience = 5, restore_best_weights = 'True')
+    # callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', patience = 5, restore_best_weights = 'True')
     
     # Creating the model
     model = generate_model(N, model_id)
@@ -243,10 +244,10 @@ def imputer(x0, inputs, targets, model_id, batch_size):
     model.compile(loss = 'MeanSquaredError', optimizer = 'adam')
     
     # Fitting the model
-    model.fit(inputs, targets, epochs = 100, batch_size = batch_size, shuffle = True, validation_split = 0.2, callbacks = [callbacks], verbose = 1)
+    model.fit(inputs, targets, epochs = 100, batch_size = batch_size, shuffle = True, validation_split = 0, verbose = 0)
     
     # Predicting on the original time series
-    preds = model.predict(x0, verbose = 1)
+    preds = model.predict(x0, verbose = 0)
 
     # Clearing the backend
     tf.keras.backend.clear_session()
@@ -255,6 +256,7 @@ def imputer(x0, inputs, targets, model_id, batch_size):
 
 
 # Defining Simulation Functions:
+## -----------------------
 
 def simulation(X, X0, MODELS, TRAIN_SIZE, BATCH_SIZE):
     
@@ -264,7 +266,7 @@ def simulation(X, X0, MODELS, TRAIN_SIZE, BATCH_SIZE):
     # Defining helpful parameters
     N = X0.shape[0]; M = X0.shape[1]
     
-    # Intializing DataFrame to store results
+    # Initializing DataFrame to store results
     results = pd.DataFrame()
     
     for m in range(M):
@@ -329,40 +331,53 @@ def simulation_save(performance, X0, model, train_size, batch_size):
     return results
 
 
-# Performing Simulations:
+## Simulation Parameters
+## -----------------------
 
+MODELS = [1]
+TRAIN_SIZE = [500, 1000, 2000]
+BATCH_SIZE = [25, 50, 100]
+
+
+# Performing Simulations:
+## -----------------------
 
 # 1. Sunspots Data
 
-sunspots = pd.read_csv('Data/Exported/sunspots_data.csv')
-sunspots0 = pd.read_csv('Data/Exported/sunspots_data0.csv')
+# Reading time series data-frames
+sunspots = pd.read_csv('Simulations/Preliminary/Data/sunspots_data.csv')
+sunspots0 = pd.read_csv('Simulations/Preliminary/Data/sunspots_data0.csv')
 
 sunspots.head()
 sunspots0.head()
 
-interp = main(sunspots0['0.3_25_1'], 1, 2, 640, 32)
+# Running the imputation simulation
+sunspots_sim = simulation(sunspots, sunspots0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
-fig = plt.figure(figsize = (12,4))
-plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
-plt.plot(sunspots['data'], color = 'green', linewidth = 0.7, label = 'Original')
-plt.plot(sunspots0['0.3_25_1'], color = 'black', label = 'Missing')
-plt.legend(fontsize = 6, loc = 'upper right')
-plt.grid()
-plt.show()
-
-simulation_perf(np.array(sunspots['data']), np.array(sunspots0['0.3_25_1']), np.array(interp))
-
-models = [1, 2]
-train_size = [320, 640, 1280]
-batch_size = [16, 32, 64]
-
-interp = simulation(sunspots, sunspots0, models, train_size, batch_size)
-
-View(interp)
-
-interp.to_csv('Data/Prelim_Autoencoder_November2023_sunspots.csv', index = False)
+# Exporting simulation performance as a csv file
+sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
 
 # Completed in ~24 hours occupying ~74 GB of RAM
+sunspots_sim.head()
+
+
+
+# Reading sunspots time series data
+sunspots = pd.read_csv('Data/Cleaned/sunspots.csv')['sunspots']
+
+# Creating sunspots data-frames
+sunspots_df = generate_df(sunspots, P, G, K)
+data = sunspots_df[0]; data0 = sunspots_df[1]
+
+# Running the imputation simulation
+sunspots_sim = simulation(data, data0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+
+# Exporting simulation performance as a csv file
+sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
+
+# Observed simulation time: ____
+sunspots_sim.head()
+
 
 
 # # 2. Apple Data
