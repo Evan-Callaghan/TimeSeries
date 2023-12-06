@@ -333,3 +333,125 @@ data_filtered %>% gt() %>%
   gt::tab_spanner(label = md('**Performance**'), columns = c(RMSE, MAE, LCL)) %>%
   gt::tab_header(title = md("**Simulation Performance**"), subtitle = paste0())
 
+
+
+
+
+
+
+
+library(latex2exp)
+library(interpTools)
+
+set.seed(1)
+X = interpTools::simXt(N = 100)$Xt
+X = (X - min(X)) / (max(X) - min(X))
+X0 = interpTools::simulateGaps(list(X), p = c(0.05), g = c(5), K = 1)[[1]]$p0.05$g5[[1]]
+
+op <- par(mfrow = c(1,1), mar = c(5,5,4,5))
+plot(X0, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$X_t^{(0)}$'), xaxt='n', yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+
+XI = zoo::na.approx(X0)
+plot(XI, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Z_t^{(0)}$'), xaxt='n', yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+
+
+
+X_train1 = XI; X_train1[50:54] = NA
+X_train2 = XI; X_train2[78:82] = NA
+
+op <- par(mfrow = c(2, 1), mar = c(3.8,5,1,5))
+plot(X_train1, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$X_{train}^{(1)}$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+plot(XI, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Y_{train}^{(1)}$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+
+
+plot(X_train2, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$X_{train}^{(maxIter)}$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+plot(XI, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Y_{train}^{(maxIter)}$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+
+
+
+X_int = X + rnorm(100, 0, 0.1)
+op <- par(mfrow = c(1,1), mar = c(5,5,4,5))
+plot(X_int, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$X_t^{(0)}$ Prediction'), 
+     xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+
+X_int_final = ifelse(is.na(X0), X_int, X0)
+plot(X_int_final, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Z_t^{(1)}$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+
+
+
+
+
+
+
+
+plot(X0, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Z_t$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+for (i in 1:30){
+  set.seed(i)
+  X_int_temp = X + rnorm(100, 0, 0.1)
+  X_int_temp_final = ifelse(is.na(X0), X_int_temp, NA)
+  lines(X_int_temp_final, type = 'p', cex = 1, pch = '-', col = 'red')
+}
+
+
+X_int1_final = ifelse(is.na(X0), X_int1, NA)
+X_int2_final = ifelse(is.na(X0), X_int2, NA)
+X_int3_final = ifelse(is.na(X0), X_int3, NA)
+X_int4_final = ifelse(is.na(X0), X_int4, NA)
+X_int5_final = ifelse(is.na(X0), X_int5, NA)
+X_int6_final = ifelse(is.na(X0), X_int6, NA)
+X_int7_final = ifelse(is.na(X0), X_int7, NA)
+X_int8_final = ifelse(is.na(X0), X_int8, NA)
+X_int9_final = ifelse(is.na(X0), X_int9, NA)
+X_int10_final = ifelse(is.na(X0), X_int10, NA)
+
+
+plot(X0, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
+     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Z_t$'), xaxt='n',  yaxt='n'); grid()
+axis(1, at = seq(0, 100, by = 10), las=1)
+axis(2, at = seq(0, 1, by = 0.5), las=1)
+
+lines(X_int1_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int2_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int3_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int4_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int5_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int6_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int7_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int8_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int9_final, type = 'p', cex = 1, pch = '-', col = 'red')
+lines(X_int10_final, type = 'p', cex = 1, pch = '-', col = 'red')
