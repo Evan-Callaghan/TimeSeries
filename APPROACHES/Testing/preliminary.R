@@ -427,31 +427,3 @@ for (i in 1:30){
   lines(X_int_temp_final, type = 'p', cex = 1, pch = '-', col = 'red')
 }
 
-
-X_int1_final = ifelse(is.na(X0), X_int1, NA)
-X_int2_final = ifelse(is.na(X0), X_int2, NA)
-X_int3_final = ifelse(is.na(X0), X_int3, NA)
-X_int4_final = ifelse(is.na(X0), X_int4, NA)
-X_int5_final = ifelse(is.na(X0), X_int5, NA)
-X_int6_final = ifelse(is.na(X0), X_int6, NA)
-X_int7_final = ifelse(is.na(X0), X_int7, NA)
-X_int8_final = ifelse(is.na(X0), X_int8, NA)
-X_int9_final = ifelse(is.na(X0), X_int9, NA)
-X_int10_final = ifelse(is.na(X0), X_int10, NA)
-
-
-plot(X0, type = 'o', lwd = 0.5, pch = 16, cex = 0.5, 
-     xlab = latex2exp::TeX('time ($t$)'), ylab = latex2exp::TeX('$Z_t$'), xaxt='n',  yaxt='n'); grid()
-axis(1, at = seq(0, 100, by = 10), las=1)
-axis(2, at = seq(0, 1, by = 0.5), las=1)
-
-lines(X_int1_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int2_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int3_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int4_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int5_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int6_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int7_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int8_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int9_final, type = 'p', cex = 1, pch = '-', col = 'red')
-lines(X_int10_final, type = 'p', cex = 1, pch = '-', col = 'red')
