@@ -11,6 +11,13 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
+# Configuing GPU setup: 
+## -----------------------
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], True)
+tf.config.experimental.set_memory_growth(physical_devices[1], True)
+
+
 # Defining "Autoencoder" Functions: 
 ## -----------------------
 
@@ -29,17 +36,20 @@ def main(x0, max_iter, model_id, train_size, batch_size):
     print('P:', p, '   G:', g, '   Model:', model_id, '   train_size:', train_size, '   batch_size:', batch_size)
     
     for i in range(max_iter):
-        
-        # Steps 3/4: Simulating time series and imposing gap structure
-        data = simulator(x0, xV, p, g, i, train_size)
-        inputs = data[0]; targets = data[1]
-        
-        # Step 5: Performing the imputation
-        preds = imputer(x0, inputs, targets, model_id, batch_size)
-        
-        # Step 6: Extracting the predicted values and updating imputed series
-        xV = np.where(np.isnan(x0), preds, x0); results[i,:] = xV
-        
+      
+      # Steps 3/4: Simulating time series and imposing gap structure
+      data = simulator(x0, xV, p, g, i, train_size)
+      inputs = data[0]; targets = data[1]
+      
+      # Step 5: Performing the imputation
+      preds = imputer(x0, inputs, targets, model_id, batch_size)
+      
+      # Step 6: Extracting the predicted values and updating imputed series
+      xV = np.where(np.isnan(x0), preds, x0); results[i,:] = xV
+      
+      # Clearing intermediate results
+      del data, inputs, targets
+    
     # Returning a point estimation for each missing data point
     if (max_iter == 1):
         return results[0,]
@@ -104,8 +114,8 @@ def linear(x0):
 def simulator(x0, xV, p, g, iteration, train_size):
     
     N = np.size(xV)
-    inputs = np.zeros((train_size, N, 1))
-    targets = np.zeros((train_size, N, 1))
+    inputs = np.zeros((train_size, N, 1), dtype = 'float32')
+    targets = np.zeros((train_size, N, 1), dtype = 'float32')
     
     for i in range(train_size):
         
@@ -228,28 +238,38 @@ def generate_model(N, model_id):
 
 def imputer(x0, inputs, targets, model_id, batch_size):
     
-    # Formatting
+    # Storing series length
     N = np.shape(inputs)[1]
+    
+    # Storing inputs, targets, and x0 as tensors
+    inputs = tf.constant(inputs); targets = tf.constant(targets)
     x0 = tf.constant(np.where(np.isnan(x0), 0, x0).reshape(1, N, 1))
-    inputs = tf.constant(inputs)
-    targets = tf.constant(targets)
     
-    # Defining EarlyStopping calback
-    # callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', patience = 5, restore_best_weights = 'True')
+    # Defining EarlyStopping callback
+    callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'loss', patience = 10, restore_best_weights = 'True')
     
-    # Creating the model
-    model = generate_model(N, model_id)
+    # Defining the distributed strategy for model fitting
+    strategy = tf.distribute.MirroredStrategy(devices = ['/gpu:0', '/gpu:1'])
     
-    # Compiling the model
-    model.compile(loss = 'MeanSquaredError', optimizer = 'adam')
+    with strategy.scope():
+      
+      # Creating the model
+      model = generate_model(N, model_id)
+      
+      # Compiling the model
+      model.compile(loss = 'MeanSquaredError', optimizer = 'adam')
+      
+      # Fitting the model
+      model.fit(inputs, targets, epochs = 100, batch_size = batch_size, shuffle = True, validation_split = 0, callbacks = [callbacks], verbose = 0)
     
-    # Fitting the model
-    model.fit(inputs, targets, epochs = 100, batch_size = batch_size, shuffle = True, validation_split = 0, verbose = 0)
+    # Generating new model and copying trained model weights
+    prediction_model = generate_model(N, model_id)
+    prediction_model.set_weights(model.get_weights())  
     
     # Predicting on the original time series
-    preds = model.predict(x0, verbose = 0)
+    preds = prediction_model.predict(x0, verbose = 0)
 
-    # Clearing the backend
+    # Clearing the TensorFlow backend
     tf.keras.backend.clear_session()
     
     return preds[0,:,0]
@@ -288,6 +308,9 @@ def simulation(X, X0, MODELS, TRAIN_SIZE, BATCH_SIZE):
 
                     # Appending iteration results to total results
                     results = pd.concat([results, results_iter], axis = 0)
+                    
+                    # Sanity Check: Saving progress 
+                    results.to_csv('Simulations/Preliminary/Results/simulation_check_in.csv', index = False)
     
     # Resetting indices
     results = results.reset_index(drop = True)
@@ -336,7 +359,7 @@ def simulation_save(performance, X0, model, train_size, batch_size):
 
 MODELS = [1]
 TRAIN_SIZE = [500, 1000, 2000]
-BATCH_SIZE = [25, 50, 100]
+BATCH_SIZE = [16, 32, 64]
 
 
 # Performing Simulations:
@@ -357,89 +380,51 @@ sunspots_sim = simulation(sunspots, sunspots0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 # Exporting simulation performance as a csv file
 sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
 
-# Completed in ~24 hours occupying ~74 GB of RAM
+# Completed in ~24 hours occupying ~36 GB of RAM
 sunspots_sim.head()
 
 
+# 2. Apple Data
 
-# Reading sunspots time series data
-sunspots = pd.read_csv('Data/Cleaned/sunspots.csv')['sunspots']
+# Reading time series data-frames
+apple = pd.read_csv('Simulations/Preliminary/Data/apple_data.csv')
+apple0 = pd.read_csv('Simulations/Preliminary/Data/apple_data0.csv')
 
-# Creating sunspots data-frames
-sunspots_df = generate_df(sunspots, P, G, K)
-data = sunspots_df[0]; data0 = sunspots_df[1]
+apple.head()
+apple0.head()
 
 # Running the imputation simulation
-sunspots_sim = simulation(data, data0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+apple_sim = simulation(apple, apple0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
-sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
+apple_sim.to_csv('Simulations/Preliminary/Results/Prelim_apple.csv', index = False)
 
-# Observed simulation time: ____
-sunspots_sim.head()
-
-
-
-# # 2. Apple Data
-# 
-# apple = pd.read_csv('Data/Exported/apple_data.csv')
-# apple0 = pd.read_csv('Data/Exported/apple_data0.csv')
-# 
-# apple.head()
-# apple0.head()
-# 
-# interp = main(apple0['0.3_25_1'], 1, 2, 640, 32)
-# 
-# fig = plt.figure(figsize = (12,4))
-# plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
-# plt.plot(apple['data'], color = 'green', linewidth = 0.7, label = 'Original')
-# plt.plot(apple0['0.3_25_1'], color = 'black', label = 'Missing')
-# plt.legend(fontsize = 6, loc = 'upper right')
-# plt.grid()
-# plt.show()
-# 
-# simulation_perf(np.array(apple['data']), np.array(apple0['0.3_25_1']), np.array(interp))
-# 
-# models = [1, 2]
-# train_size = [320, 640, 1280]
-# batch_size = [16, 32, 64]
-# 
-# interp = simulation(apple, apple0, models, train_size, batch_size)
-# 
-# interp.head()
-# 
-# interp.to_csv('Data/Prelim_Autoencoder_November2023_apple.csv', index = False)
+# Completed in ~__ hours occupying ~__ GB of RAM
+apple_sim.head()
 
 
-# # 3. Temperature Data
-# 
-# temperature = pd.read_csv('Data/Exported/temperature_data.csv')
-# temperature0 = pd.read_csv('Data/Exported/temperature_data0.csv')
-# 
-# temperature.head()
-# temperature0.head()
-# 
-# interp = main(temperature0['0.3_25_1'], 1, 2, 640, 32)
-# 
-# fig = plt.figure(figsize = (12,4))
-# plt.plot(interp, color = 'red', linewidth = 0.7, label = 'Interpolation')
-# plt.plot(temperature['data'], color = 'green', linewidth = 0.7, label = 'Original')
-# plt.plot(temperature0['0.3_25_1'], color = 'black', label = 'Missing')
-# plt.legend(fontsize = 6, loc = 'upper right')
-# plt.grid()
-# plt.show()
-# 
-# simulation_perf(np.array(temperature['data']), np.array(temperature0['0.3_25_1']), np.array(interp))
-# 
-# models = [1, 2]
-# train_size = [320, 640, 1280]
-# batch_size = [16, 32, 64]
-# 
-# interp = simulation(temperature, temperature0, models, train_size, batch_size)
-# 
-# interp.head()
-# 
-# interp.to_csv('Data/Prelim_Autoencoder_November2023_temperature.csv', index = False)
+
+# 3. Temperature Data
+
+# Reading time series data-frames
+temperature = pd.read_csv('Simulations/Preliminary/Data/temperature_data.csv')
+temperature0 = pd.read_csv('Simulations/Preliminary/Data/temperature_data0.csv')
+
+temperature.head()
+temperature0.head()
+
+# Running the imputation simulation
+temperature_sim = simulation(temperature, temperature0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+
+# Exporting simulation performance as a csv file
+temperature_sim.to_csv('Simulations/Preliminary/Results/Prelim_temperature.csv', index = False)
+
+# Completed in ~__ hours occupying ~__ GB of RAM
+temperature_sim.head()
+
+
+
+
 
 
 # 4. High SNR Data
@@ -471,3 +456,26 @@ interp = simulation(high_snr, high_snr0, models, train_size, batch_size)
 interp.head()
 
 interp.to_csv('Data/Prelim_Autoencoder_November2023_high_snr.csv', index = False)
+
+
+
+
+
+
+
+
+N = 1000
+model = tf.keras.Sequential(name = 'Autoencoder')
+model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
+model.add(tf.keras.layers.LSTM(64, return_sequences = True, name = 'LSTM'))
+model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Encoder1'))
+model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Encoder2'))
+model.add(tf.keras.layers.Dense(16, activation = 'relu', name = 'Connected'))
+model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Decoder1'))
+model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Decoder2'))
+model.add(tf.keras.layers.Dense(1, name = 'Output'))
+
+model.summary()
+
+
+
