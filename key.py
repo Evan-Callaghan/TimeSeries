@@ -380,7 +380,6 @@ sunspots_sim = simulation(sunspots, sunspots0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 # Exporting simulation performance as a csv file
 sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
 
-# Completed in ~24 hours occupying ~36 GB of RAM
 sunspots_sim.head()
 
 
@@ -399,7 +398,6 @@ apple_sim = simulation(apple, apple0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 # Exporting simulation performance as a csv file
 apple_sim.to_csv('Simulations/Preliminary/Results/Prelim_apple.csv', index = False)
 
-# Completed in ~__ hours occupying ~__ GB of RAM
 apple_sim.head()
 
 
@@ -423,7 +421,7 @@ temperature_sim.to_csv('Simulations/Preliminary/Results/Prelim_temperature.csv',
 temperature_sim.head()
 
 
-
+View(temperature_sim)
 
 
 
