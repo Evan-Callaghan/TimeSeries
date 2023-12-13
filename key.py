@@ -449,6 +449,8 @@ models = [1, 2]
 train_size = [320, 640, 1280]
 batch_size = [16, 32, 64]
 
+
+
 interp = simulation(high_snr, high_snr0, models, train_size, batch_size)
 
 interp.head()
