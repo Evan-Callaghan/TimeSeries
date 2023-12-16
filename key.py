@@ -464,6 +464,8 @@ interp.to_csv('Data/Prelim_Autoencoder_November2023_high_snr.csv', index = False
 
 
 
+
+
 N = 1000
 model = tf.keras.Sequential(name = 'Autoencoder')
 model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
