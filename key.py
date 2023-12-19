@@ -462,22 +462,3 @@ interp.to_csv('Data/Prelim_Autoencoder_November2023_high_snr.csv', index = False
 
 
 
-
-
-
-
-N = 1000
-model = tf.keras.Sequential(name = 'Autoencoder')
-model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
-model.add(tf.keras.layers.LSTM(64, return_sequences = True, name = 'LSTM'))
-model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Encoder1'))
-model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Encoder2'))
-model.add(tf.keras.layers.Dense(16, activation = 'relu', name = 'Connected'))
-model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Decoder1'))
-model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Decoder2'))
-model.add(tf.keras.layers.Dense(1, name = 'Output'))
-
-model.summary()
-
-
-
