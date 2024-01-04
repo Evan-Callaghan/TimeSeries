@@ -401,7 +401,6 @@ apple_sim.to_csv('Simulations/Preliminary/Results/Prelim_apple.csv', index = Fal
 apple_sim.head()
 
 
-
 # 3. Temperature Data
 
 # Reading time series data-frames
@@ -421,44 +420,39 @@ temperature_sim.to_csv('Simulations/Preliminary/Results/Prelim_temperature.csv',
 temperature_sim.head()
 
 
-View(temperature_sim)
-
-
-
 # 4. High SNR Data
 
-high_snr = pd.read_csv('Data/Exported/high_snr_data.csv')
-high_snr0 = pd.read_csv('Data/Exported/high_snr_data0.csv')
+# Reading time series data-frames
+high_snr = pd.read_csv('Simulations/Preliminary/Data/high_snr_data.csv')
+high_snr0 = pd.read_csv('Simulations/Preliminary/Data/high_snr_data0.csv')
 
 high_snr.head()
 high_snr0.head()
 
-interp = main(high_snr0['0.3_25_1'], 1, 2, 640, 32)
+# Running the imputation simulation
+high_snr_sim = simulation(high_snr, high_snr0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
-fig = plt.figure(figsize = (12,4))
-plt.plot(interp, color = 'red', linewidth = 0.3, label = 'Interpolation')
-plt.plot(high_snr['data'], color = 'green', linewidth = 0.3, label = 'Original')
-plt.plot(high_snr0['0.3_25_1'], color = 'black', label = 'Missing')
-plt.legend(fontsize = 6, loc = 'upper right')
-plt.grid()
-plt.show()
+# Exporting simulation performance as a csv file
+high_snr_sim.to_csv('Simulations/Preliminary/Results/Prelim_high_snr.csv', index = False)
 
-simulation_perf(np.array(high_snr['data']), np.array(high_snr0['0.3_25_1']), np.array(interp))
-
-models = [1, 2]
-train_size = [320, 640, 1280]
-batch_size = [16, 32, 64]
+# Completed in ~__ hours occupying ~__ GB of RAM
+high_snr_sim.head()
 
 
+# 5. Low SNR Data
 
-interp = simulation(high_snr, high_snr0, models, train_size, batch_size)
+# Reading time series data-frames
+low_snr = pd.read_csv('Simulations/Preliminary/Data/low_snr_data.csv')
+low_snr0 = pd.read_csv('Simulations/Preliminary/Data/low_snr_data0.csv')
 
-interp.head()
+low_snr.head()
+low_snr0.head()
 
-interp.to_csv('Data/Prelim_Autoencoder_November2023_high_snr.csv', index = False)
+# Running the imputation simulation
+low_snr_sim = simulation(low_snr, low_snr0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
+# Exporting simulation performance as a csv file
+low_snr_sim.to_csv('Simulations/Preliminary/Results/Prelim_low_snr.csv', index = False)
 
-
-
-
-
+# Completed in ~__ hours occupying ~__ GB of RAM
+low_snr_sim.head()
