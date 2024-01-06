@@ -456,3 +456,26 @@ low_snr_sim.to_csv('Simulations/Preliminary/Results/Prelim_low_snr.csv', index =
 
 # Completed in ~__ hours occupying ~__ GB of RAM
 low_snr_sim.head()
+
+
+# 6. Modulated Data
+
+# Reading time series data-frames
+modulated = pd.read_csv('Simulations/Preliminary/Data/modulated_data.csv')
+modulated0 = pd.read_csv('Simulations/Preliminary/Data/modulated_data0.csv')
+
+modulated.head()
+modulated0.head()
+
+# Running the imputation simulation
+modulated_sim = simulation(modulated, modulated0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+
+# Exporting simulation performance as a csv file
+modulated_sim.to_csv('Simulations/Preliminary/Results/Prelim_modulated.csv', index = False)
+
+# Completed in ~__ hours occupying ~__ GB of RAM
+modulated_sim.head()
+
+
+
+
