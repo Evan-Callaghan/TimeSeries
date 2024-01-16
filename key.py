@@ -383,6 +383,10 @@ sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index
 sunspots_sim.head()
 
 
+sunspots = sunspots.iloc[0:500]
+sunspots0 = sunspots0.iloc[0:500]
+View(sunspots0)
+
 # 2. Apple Data
 
 # Reading time series data-frames
@@ -475,7 +479,3 @@ modulated_sim.to_csv('Simulations/Preliminary/Results/Prelim_modulated.csv', ind
 
 # Completed in ~__ hours occupying ~__ GB of RAM
 modulated_sim.head()
-
-
-
-
