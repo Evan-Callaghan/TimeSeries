@@ -5,8 +5,8 @@ import scipy
 import random
 import math
 import tensorflow as tf
-import matplotlib.pyplot as plt
-
+import gc
+import time
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -33,6 +33,7 @@ def main(x0, max_iter, model_id, train_size, batch_size):
     xV = linear(x0)
     
     # Sanity Check
+    start = time.time()
     print('P:', p, '   G:', g, '   Model:', model_id, '   train_size:', train_size, '   batch_size:', batch_size)
     
     for i in range(max_iter):
@@ -47,8 +48,11 @@ def main(x0, max_iter, model_id, train_size, batch_size):
       # Step 6: Extracting the predicted values and updating imputed series
       xV = np.where(np.isnan(x0), preds, x0); results[i,:] = xV
       
-      # Clearing intermediate results
-      del data, inputs, targets
+    # Clearing space in memory
+    del data, inputs, targets, x0, xV; gc.collect()
+    
+    end = time.time()
+    print(end - start)
     
     # Returning a point estimation for each missing data point
     if (max_iter == 1):
@@ -272,6 +276,9 @@ def imputer(x0, inputs, targets, model_id, batch_size):
     # Clearing the TensorFlow backend
     tf.keras.backend.clear_session()
     
+    # Clearing space in memory
+    del model, prediction_model; gc.collect()
+    
     return preds[0,:,0]
 
 
@@ -375,17 +382,13 @@ sunspots.head()
 sunspots0.head()
 
 # Running the imputation simulation
-sunspots_sim = simulation(sunspots, sunspots0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+sunspots_sim = simulation(sunspots, sunspots0.iloc[0:500,0:1], MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
 sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
 
 sunspots_sim.head()
 
-
-sunspots = sunspots.iloc[0:500]
-sunspots0 = sunspots0.iloc[0:500]
-View(sunspots0)
 
 # 2. Apple Data
 
