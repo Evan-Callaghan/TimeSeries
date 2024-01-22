@@ -376,13 +376,13 @@ BATCH_SIZE = [16, 32, 64]
 
 # Reading time series data-frames
 sunspots = pd.read_csv('Simulations/Preliminary/Data/sunspots_data.csv')
-sunspots0 = pd.read_csv('Simulations/Preliminary/Data/sunspots_data0.csv')
+sunspots0 = pd.read_csv('Simulations/Preliminary/Data/sunspots0_data.csv')
 
 sunspots.head()
 sunspots0.head()
 
 # Running the imputation simulation
-sunspots_sim = simulation(sunspots, sunspots0.iloc[0:500,0:1], MODELS, TRAIN_SIZE, BATCH_SIZE)
+sunspots_sim = simulation(sunspots, sunspots0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
 sunspots_sim.to_csv('Simulations/Preliminary/Results/Prelim_sunspots.csv', index = False)
@@ -431,7 +431,7 @@ temperature_sim.head()
 
 # Reading time series data-frames
 high_snr = pd.read_csv('Simulations/Preliminary/Data/high_snr_data.csv')
-high_snr0 = pd.read_csv('Simulations/Preliminary/Data/high_snr_data0.csv')
+high_snr0 = pd.read_csv('Simulations/Preliminary/Data/high_snr0_data.csv')
 
 high_snr.head()
 high_snr0.head()
@@ -440,10 +440,16 @@ high_snr0.head()
 high_snr_sim = simulation(high_snr, high_snr0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
-high_snr_sim.to_csv('Simulations/Preliminary/Results/Prelim_high_snr.csv', index = False)
-
-# Completed in ~__ hours occupying ~__ GB of RAM
+high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data.csv', index = False)
 high_snr_sim.head()
+
+results = pd.read_csv('Simulations/Preliminary/Results/simulation_check_in.csv')
+
+results_p05_g5 = results.iloc[0:900]
+results_p05_g5.tail()
+results_p05_g5.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data.csv', index = False)
+
+View(results)
 
 
 # 5. Low SNR Data
