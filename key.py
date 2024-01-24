@@ -488,3 +488,6 @@ modulated_sim.to_csv('Simulations/Preliminary/Results/Prelim_modulated.csv', ind
 
 # Completed in ~__ hours occupying ~__ GB of RAM
 modulated_sim.head()
+
+
+
