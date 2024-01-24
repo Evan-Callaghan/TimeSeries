@@ -434,22 +434,17 @@ high_snr = pd.read_csv('Simulations/Preliminary/Data/high_snr_data.csv')
 high_snr0 = pd.read_csv('Simulations/Preliminary/Data/high_snr0_data.csv')
 
 high_snr.head()
-high_snr0.head()
+high_snr0.iloc[:,200:300].head()
+high_snr0.iloc[:,200:300].shape
 
 # Running the imputation simulation
-high_snr_sim = simulation(high_snr, high_snr0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+high_snr_sim = simulation(high_snr, high_snr0.iloc[:,200:300], MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
-high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data.csv', index = False)
+high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data3.csv', index = False)
 high_snr_sim.head()
 
-results = pd.read_csv('Simulations/Preliminary/Results/simulation_check_in.csv')
 
-results_p05_g5 = results.iloc[0:900]
-results_p05_g5.tail()
-results_p05_g5.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data.csv', index = False)
-
-View(results)
 
 
 # 5. Low SNR Data
@@ -488,6 +483,3 @@ modulated_sim.to_csv('Simulations/Preliminary/Results/Prelim_modulated.csv', ind
 
 # Completed in ~__ hours occupying ~__ GB of RAM
 modulated_sim.head()
-
-
-
