@@ -434,14 +434,14 @@ high_snr = pd.read_csv('Simulations/Preliminary/Data/high_snr_data.csv')
 high_snr0 = pd.read_csv('Simulations/Preliminary/Data/high_snr0_data.csv')
 
 high_snr.head()
-high_snr0.iloc[:,200:300].head()
-high_snr0.iloc[:,200:300].shape
+high_snr0.iloc[:,300:400].head()
+high_snr0.iloc[:,300:400].shape
 
 # Running the imputation simulation
-high_snr_sim = simulation(high_snr, high_snr0.iloc[:,200:300], MODELS, TRAIN_SIZE, BATCH_SIZE)
+high_snr_sim = simulation(high_snr, high_snr0.iloc[:,300:400], MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
-high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data3.csv', index = False)
+high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_data4.csv', index = False)
 high_snr_sim.head()
 
 
