@@ -213,32 +213,39 @@ def create_model(N, units, connected_units, activation):
     return model
 
 def generate_model(N, model_id):
+  if (model_id == 1):
+    model = tf.keras.Sequential(name = 'Autoencoder')
+    model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
+    model.add(tf.keras.layers.LSTM(64, return_sequences = True, name = 'LSTM'))
+    model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Encoder1'))
+    model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Encoder2'))
+    model.add(tf.keras.layers.Dense(16, activation = 'relu', name = 'Connected'))
+    model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Decoder1'))
+    model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Decoder2'))
+    model.add(tf.keras.layers.Dense(1, name = 'Output'))
     
-    if (model_id == 1):
-        
-        model = tf.keras.Sequential(name = 'Autoencoder')
-        model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
-        model.add(tf.keras.layers.LSTM(64, return_sequences = True, name = 'LSTM'))
-        model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Encoder1'))
-        model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Encoder2'))
-        model.add(tf.keras.layers.Dense(16, activation = 'relu', name = 'Connected'))
-        model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Decoder1'))
-        model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Decoder2'))
-        model.add(tf.keras.layers.Dense(1, name = 'Output'))
-        
-    elif (model_id == 2):
-        
-        model = tf.keras.Sequential(name = 'Autoencoder')
-        model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
-        model.add(tf.keras.layers.LSTM(128, return_sequences = True, name = 'LSTM'))
-        model.add(tf.keras.layers.Dense(128, activation = 'relu', name = 'Encoder1'))
-        model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Encoder2'))
-        model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Connected'))
-        model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Decoder1'))
-        model.add(tf.keras.layers.Dense(128, activation = 'relu', name = 'Decoder2'))
-        model.add(tf.keras.layers.Dense(1, name = 'Output'))
-        
-    return model
+  elif (model_id == 2):
+    model = tf.keras.Sequential(name = 'Autoencoder')
+    model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
+    model.add(tf.keras.layers.LSTM(128, return_sequences = True, name = 'LSTM'))
+    model.add(tf.keras.layers.Dense(128, activation = 'relu', name = 'Encoder1'))
+    model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Encoder2'))
+    model.add(tf.keras.layers.Dense(32, activation = 'relu', name = 'Connected'))
+    model.add(tf.keras.layers.Dense(64, activation = 'relu', name = 'Decoder1'))
+    model.add(tf.keras.layers.Dense(128, activation = 'relu', name = 'Decoder2'))
+    model.add(tf.keras.layers.Dense(1, name = 'Output'))
+    
+  elif (model_id == 3):
+    model = tf.keras.Sequential(name = 'Autoencoder')
+    model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
+    model.add(tf.keras.layers.LSTM(64, activation='relu', return_sequences = True, name = 'Encoder1'))
+    model.add(tf.keras.layers.LSTM(32, activation='relu', return_sequences = False, name = 'Encoder2'))
+    model.add(tf.keras.layers.RepeatVector(N))
+    model.add(tf.keras.layers.LSTM(32, activation='relu', return_sequences=True, name = 'Decoder1'))
+    model.add(tf.keras.layers.LSTM(64, activation='relu', return_sequences=True, name = 'Decoder2'))
+    model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1, name = 'Output')))
+    
+  return model
 
 def imputer(x0, inputs, targets, model_id, batch_size):
     
@@ -483,3 +490,29 @@ modulated_sim.to_csv('Simulations/Preliminary/Results/Prelim_modulated.csv', ind
 
 # Completed in ~__ hours occupying ~__ GB of RAM
 modulated_sim.head()
+
+
+
+
+
+
+test_series = np.zeros((500))
+test_series[0:80] = np.arange(0, 80, 1)
+test_series[80:90] = np.nan
+test_series[90:500] = np.arange(90, 500, 1)
+
+test_series
+
+
+imp = main(x0 = test_series, max_iter = 1, model_id = 3, train_size = 1000, batch_size = 64)
+imp
+
+
+model = generate_model(N = 1000, model_id = 3)
+model.summary()
+
+
+
+imputation = main(np.array(high_snr0['P0.2_G10_K50']), 1, 3, 1000, 32)
+imputation
+
