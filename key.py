@@ -7,6 +7,7 @@ import math
 import tensorflow as tf
 import gc
 import time
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -504,8 +505,15 @@ test_series[90:500] = np.arange(90, 500, 1)
 test_series
 
 
-imp = main(x0 = test_series, max_iter = 1, model_id = 3, train_size = 1000, batch_size = 64)
+imp = main(x0 = test_series, max_iter = 1, model_id = 1, train_size = 10000, batch_size = 128)
 imp
+
+
+
+plt.figure()
+plt.plot(test_series, color = 'red', label = 'Input')
+plt.plot(imp, linewidth = 0.8, linestyle = 'dotted', label = 'Interpolation')
+plt.show()
 
 
 model = generate_model(N = 1000, model_id = 3)
@@ -513,6 +521,15 @@ model.summary()
 
 
 
-imputation = main(np.array(high_snr0['P0.2_G10_K50']), 1, 3, 1000, 32)
-imputation
+# Sunspots Visualization
+imp = main(x0 = sunspots0['P0.1_G50_K1'], max_iter = 1, model_id = 1, train_size = 10000, batch_size = 128)
+imp
+
+plt.figure()
+plt.plot(sunspots['data'], color = 'black', linewidth = 0.5)
+plt.plot(imp, color = 'red', linewidth = 0.8, linestyle = 'dotted', label = 'Interpolation')
+
+plt.plot(sunspots0['P0.1_G50_K1'], label = 'Input', linewidth = 1.5)
+plt.show()
+
 
