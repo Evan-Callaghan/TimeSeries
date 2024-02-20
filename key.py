@@ -374,7 +374,7 @@ def simulation_save(performance, X0, model, train_size, batch_size):
 
 MODELS = [1]
 TRAIN_SIZE = [2000]
-BATCH_SIZE = [16, 32, 48, 64, 80, 96, 112, 128]
+BATCH_SIZE = [16, 32, 64, 128]
 
 
 # Performing Simulations:
@@ -494,6 +494,38 @@ modulated_sim.head()
 
 
 
+# -------------------
+# Batch Size Experiment
+
+# Experiment parameters
+MODELS = [1]
+TRAIN_SIZE = [2000]
+# BATCH_SIZE = [16, 20, 24, 28, 32, 36, 40, 44, 48, 64, 80, 96, 112, 128]
+BATCH_SIZE = [16, 20, 24, 28]
+
+# Reading time series data-frames
+high_snr = pd.read_csv('Simulations/Preliminary/Data/high_snr_data.csv')
+high_snr0 = pd.read_csv('Simulations/Preliminary/Data/high_snr0_batch_experiment.csv')
+
+high_snr.head()
+high_snr0.head()
+high_snr0.shape
+
+# Running the imputation simulation
+high_snr_sim = simulation(high_snr, high_snr0, MODELS, TRAIN_SIZE, BATCH_SIZE)
+
+# Exporting simulation performance as a csv file
+high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_batch_experiment1.csv', index = False)
+high_snr_sim.head()
+
+
+
+
+
+
+
+
+
 
 
 
@@ -528,6 +560,17 @@ imp
 plt.figure()
 plt.plot(sunspots['data'], color = 'black', linewidth = 0.5)
 plt.plot(imp, color = 'red', linewidth = 0.8, linestyle = 'dotted', label = 'Interpolation')
+
+plt.plot(sunspots0['P0.1_G50_K1'], label = 'Input', linewidth = 1.5)
+plt.show()
+
+
+imp2 = main(x0 = sunspots0['P0.1_G50_K1'], max_iter = 1, model_id = 1, train_size = 500, batch_size = 128)
+imp2
+
+plt.figure()
+plt.plot(sunspots['data'], color = 'black', linewidth = 0.5)
+plt.plot(imp2, color = 'red', linewidth = 0.8, linestyle = 'dotted', label = 'Interpolation')
 
 plt.plot(sunspots0['P0.1_G50_K1'], label = 'Input', linewidth = 1.5)
 plt.show()
