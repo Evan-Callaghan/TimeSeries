@@ -501,7 +501,7 @@ modulated_sim.head()
 MODELS = [1]
 TRAIN_SIZE = [2000]
 # BATCH_SIZE = [16, 20, 24, 28, 32, 36, 40, 44, 48, 64, 80, 96, 112, 128]
-BATCH_SIZE = [16, 20, 24, 28]
+BATCH_SIZE = [112, 128]
 
 # Reading time series data-frames
 high_snr = pd.read_csv('Simulations/Preliminary/Data/high_snr_data.csv')
@@ -515,13 +515,17 @@ high_snr0.shape
 high_snr_sim = simulation(high_snr, high_snr0, MODELS, TRAIN_SIZE, BATCH_SIZE)
 
 # Exporting simulation performance as a csv file
-high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_batch_experiment1.csv', index = False)
+high_snr_sim.to_csv('Simulations/Preliminary/Results/Preliminary_high_snr_batch_experiment4.csv', index = False)
 high_snr_sim.head()
 
 
+sim1 = read.csv('Simulations/Preliminary/Results/Preliminary_high_snr_batch_experiment1.csv)
+sim2 = read.csv('Simulations/Preliminary/Results/Preliminary_high_snr_batch_experiment2.csv)
+sim3 = read.csv('Simulations/Preliminary/Results/Preliminary_high_snr_batch_experiment3.csv)
 
+sims = rbind(sim1, sim2, sim3)
 
-
+sims.head()
 
 
 
