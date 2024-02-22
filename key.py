@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 ## -----------------------
 physical_devices = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
-tf.config.experimental.set_memory_growth(physical_devices[1], True)
+#tf.config.experimental.set_memory_growth(physical_devices[1], True)
 
 
 # Defining "Autoencoder" Functions: 
@@ -261,9 +261,10 @@ def imputer(x0, inputs, targets, model_id, batch_size):
     callbacks = tf.keras.callbacks.EarlyStopping(monitor = 'loss', patience = 10, restore_best_weights = 'True')
     
     # Defining the distributed strategy for model fitting
-    strategy = tf.distribute.MirroredStrategy(devices = ['/gpu:0', '/gpu:1'])
+    #strategy = tf.distribute.MirroredStrategy(devices = ['/gpu:0', '/gpu:1'])
+    #with strategy.scope():
     
-    with strategy.scope():
+    with tf.device('/GPU:0'):
       
       # Creating the model
       model = generate_model(N, model_id)
@@ -558,7 +559,7 @@ model.summary()
 
 
 # Sunspots Visualization
-imp = main(x0 = sunspots0['P0.1_G50_K1'], max_iter = 1, model_id = 1, train_size = 10000, batch_size = 128)
+imp = main(x0 = sunspots0['P0.1_G50_K1'], max_iter = 1, model_id = 1, train_size = 2000, batch_size = 128)
 imp
 
 plt.figure()
