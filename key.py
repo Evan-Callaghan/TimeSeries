@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # Configuing GPU setup: 
 ## -----------------------
 physical_devices = tf.config.list_physical_devices('GPU')
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
+#tf.config.experimental.set_memory_growth(physical_devices[0], True)
 #tf.config.experimental.set_memory_growth(physical_devices[1], True)
 
 
@@ -579,5 +579,24 @@ plt.plot(imp2, color = 'red', linewidth = 0.8, linestyle = 'dotted', label = 'In
 
 plt.plot(sunspots0['P0.1_G50_K1'], label = 'Input', linewidth = 1.5)
 plt.show()
+
+
+
+
+
+
+# Proof of Concept
+# ----------------
+
+# Generating Data
+true_series = np.arange(0, 1000, dtype = float)
+missing_series = true_series.copy(); missing_series[475:525] = np.nan
+input_1 = true_series.copy(); input_1[230:280] = np.nan
+input_2 = true_series.copy(); input_2[105:155] = np.nan
+input_3 = true_series.copy(); input_3[860:910] = np.nan
+
+proof_data = pd.DataFrame({'true_series':true_series, 'missing_series':missing_series, 'input_1':input_1, 'input_2':input_2, 'input_3':input_3})
+proof_data.head()
+
 
 
