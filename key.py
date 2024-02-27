@@ -239,12 +239,13 @@ def generate_model(N, model_id):
   elif (model_id == 3):
     model = tf.keras.Sequential(name = 'Autoencoder')
     model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
-    model.add(tf.keras.layers.LSTM(64, activation='relu', return_sequences = True, name = 'Encoder1'))
-    model.add(tf.keras.layers.LSTM(32, activation='relu', return_sequences = False, name = 'Encoder2'))
-    model.add(tf.keras.layers.RepeatVector(N))
-    model.add(tf.keras.layers.LSTM(32, activation='relu', return_sequences=True, name = 'Decoder1'))
-    model.add(tf.keras.layers.LSTM(64, activation='relu', return_sequences=True, name = 'Decoder2'))
-    model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1, name = 'Output')))
+    model.add(tf.keras.layers.LSTM(64, activation = 'relu', return_sequences = True, name = 'Encoder1'))
+    model.add(tf.keras.layers.LSTM(32, activation = 'relu', return_sequences = False, name = 'Encoder2'))
+    model.add(tf.keras.layers.RepeatVector(N, name = 'Connected'))
+    model.add(tf.keras.layers.LSTM(32, activation = 'relu', return_sequences = True, name = 'Decoder1'))
+    model.add(tf.keras.layers.LSTM(64, activation = 'relu', return_sequences = True, name = 'Decoder2'))
+    model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1)))
+    model.summary()
     
   return model
 
@@ -598,5 +599,20 @@ input_3 = true_series.copy(); input_3[860:910] = np.nan
 proof_data = pd.DataFrame({'true_series':true_series, 'missing_series':missing_series, 'input_1':input_1, 'input_2':input_2, 'input_3':input_3})
 proof_data.head()
 
+
+
+
+
+N = 1000
+
+model = tf.keras.Sequential(name = 'Autoencoder')
+model.add(tf.keras.layers.Input(shape = (N, 1), name = 'Input'))
+model.add(tf.keras.layers.LSTM(64, activation = 'relu', return_sequences = True, name = 'Encoder1'))
+model.add(tf.keras.layers.LSTM(32, activation = 'relu', return_sequences = False, name = 'Encoder2'))
+model.add(tf.keras.layers.RepeatVector(N, name = 'Connected'))
+model.add(tf.keras.layers.LSTM(32, activation = 'relu', return_sequences = True, name = 'Decoder1'))
+model.add(tf.keras.layers.LSTM(64, activation = 'relu', return_sequences = True, name = 'Decoder2'))
+model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1)))
+model.summary()
 
 
